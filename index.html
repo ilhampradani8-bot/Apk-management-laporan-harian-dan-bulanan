@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Barokah Egg Pro</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#FFD700">
+<link rel="apple-touch-icon" href="icon.png">
+
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js')
+        .then(reg => console.log('App Siap Offline!', reg.scope))
+        .catch(err => console.log('Gagal SW:', err));
+    });
+  }
+</script>
+</head>
+<body>
+
+    <header class="app-header">
+        <h2 id="header-nama">TELUR BAROKAH</h2>
+        <span id="header-wa">082233121758</span>
+    </header>
+
+
+<main>
+    <section id="page-input" class="page active">
+        <div class="modern-card">
+            <h3>Kasir (Penjualan)</h3>
+<div class="form-grid">
+    <input type="date" id="tgl">
+    <select id="pilih-produk">
+        <option value="">-- Pilih Produk --</option>
+    </select>
+    <input type="text" id="jual_nama" placeholder="Nama Pembeli">
+    <input type="number" id="jual_qty" placeholder="Jumlah Jual (kg)">
+    <input type="number" id="harga_jual" placeholder="Harga Jual (Rp)">
+    <div class="input-box full" style="display: flex; align-items: center; gap: 10px; background: #fffde7; padding: 10px; border-radius: 8px;">
+        <input type="checkbox" id="is-piutang" style="width: 20px; margin: 0;">
+        <label for="is-piutang" style="font-weight: bold; color: #856404;">Tandai sebagai Piutang (Warna Kuning)</label>
+    </div>
+</div>
+            <button id="btnSimpanJual" class="btn-primary">PROSES JUAL</button>
+        </div>
+    </section>
+
+    <section id="page-masuk" class="page">
+        <div class="modern-card">
+            <h3>Input Pembelian</h3>
+            <div class="form-grid">
+                <input type="date" id="tgl_masuk">
+                <input type="text" id="supplier" placeholder="Nama Supplier">
+                <input type="text" id="produk_masuk" placeholder="Nama Produk">
+                <input type="number" id="qty_masuk" placeholder="Jumlah (kg)">
+                <input type="number" id="harga_modal" placeholder="Modal Total (Rp)">
+                <input type="number" id="harga_jual_set" placeholder="Harga Jual/kg">
+            </div>
+            <button onclick="tambahStokMasuk()" class="btn-primary">SIMPAN PEMBELIAN</button>
+        </div>
+    </section>
+
+<section id="page-stok" class="page">
+    <div class="table-actions" data-html2canvas-ignore>
+        <button onclick="exportExcel('tabelStok', 'Stok')" class="btn-green">XLS</button>
+        <button onclick="exportGambar('tabelStok', 'Data_Stok_Full')" class="btn-blue">Export Gambar</button>
+    </div>
+    <div class="excel-container">
+        <table id="tabelStok">
+            <thead>
+                <tr>
+                    <th>PRODUK</th>
+                    <th>SUPPLIER</th>
+                    <th>MODAL/KG</th> <th>HARGA JUAL</th>
+                    <th>SISA STOK</th>
+                    <th data-html2canvas-ignore>AKSI</th>
+                </tr>
+            </thead>
+            <tbody id="bodyStok"></tbody>
+            <tfoot id="footStok" class="bg-yellow"></tfoot>
+        </table>
+    </div>
+</section>
+
+
+
+
+<section id="page-harian" class="page">
+    <div class="modern-card" style="margin-bottom:10px;" data-html2canvas-ignore>
+        <div class="form-grid">
+            <input type="date" id="filter-tgl-mulai" onchange="renderHarian()">
+            <input type="date" id="filter-tgl-akhir" onchange="renderHarian()">
+            <select id="filter-barang" onchange="renderHarian()" style="grid-column: span 2;">
+                <option value="">-- Semua Barang --</option>
+            </select>
+        </div>
+    </div>
+    <div class="table-actions" data-html2canvas-ignore>
+        <button onclick="exportExcel('tabelHarian', 'Harian')" class="btn-green">XLS</button>
+        <button onclick="exportGambar('tabelHarian', 'Rekap_Harian_Full')" class="btn-blue">Export Gambar</button>
+    </div>
+    <div class="excel-container">
+        <table id="tabelHarian">
+            <thead>
+                <tr>
+                    <th rowspan="3">TANGGAL</th>
+                    <th colspan="4">REKAP PEMBELIAN DAN PENJUALAN TELUR</th>
+                    <th colspan="7">SALDO AWAL</th>
+                </tr>
+                <tr>
+                    <th colspan="2">PEMBELIAN</th>
+                    <th colspan="2">PENJUALAN</th>
+                    <th rowspan="2">Sisa Stok kg</th>
+                    <th rowspan="2">Harga/kg</th>
+                    <th rowspan="2">Uang Masuk</th>
+                    <th rowspan="2">Uang Keluar</th>
+                    <th rowspan="2">Saldo</th>
+                    <th rowspan="2">Untung/Rugi</th>
+                    <th rowspan="2">Rata2/Hari</th>
+                </tr>
+                <tr>
+                    <th>NAMA BARANG</th>
+                    <th>JUMPLAH (KG)</th>
+                    <th>NAMA</th>
+                    <th>JUMPLAH KG</th>
+                </tr>
+            </thead>
+            <tbody id="bodyHarian"></tbody>
+        </table>
+    </div>
+    <div id="sticky-saldo" class="floating-saldo" style="display:none;" data-html2canvas-ignore>
+        Total Saldo Akhir
+        <span id="txt-saldo-akhir">Rp0</span>
+    </div>
+</section>
+
+
+<section id="page-bulanan" class="page">
+    <div class="modern-card" style="margin-bottom:10px;" data-html2canvas-ignore>
+        <select id="filter-tahun" onchange="renderBulanan()">
+        </select>
+    </div>
+    <div class="table-actions" data-html2canvas-ignore>
+        <button onclick="exportExcel('tabelBulanan', 'Bulanan')" class="btn-green">XLS</button>
+        <button onclick="exportGambar('tabelBulanan', 'Laporan_Bulanan')" class="btn-blue">Export Gambar</button>
+    </div>
+    <div class="excel-container">
+        <table id="tabelBulanan">
+            <thead>
+                <tr>
+                    <th>BULAN</th>
+                    <th>TOTAL KG MASUK</th>
+                    <th>TOTAL KG KELUAR</th>
+                    <th>DIFF</th>
+                    <th>UANG MASUK</th>
+                    <th>UANG KELUAR</th>
+                    <th>KEUNTUNGAN</th>
+                </tr>
+            </thead>
+            <tbody id="bodyBulanan"></tbody>
+            <tfoot id="footerBulanan" class="bg-yellow"></tfoot>
+        </table>
+    </div>
+</section>
+
+<section id="page-set" class="page">
+    <div class="modern-card">
+        <h3>Profil Usaha</h3>
+        <div class="form-grid">
+            <div class="input-box full">
+                <input type="text" id="set-nama" placeholder="Nama Toko">
+            </div>
+            <div class="input-box full">
+                <textarea id="set-alamat" placeholder="Alamat"></textarea>
+            </div>
+            <div class="input-box">
+                <input type="text" id="set-wa" placeholder="WhatsApp">
+            </div>
+            <div class="input-box">
+                <input type="number" id="set-saldo-awal" placeholder="Saldo Awal">
+            </div>
+        </div>
+        <button onclick="simpanProfil()" class="btn-primary">SIMPAN PROFIL</button>
+        <button onclick="resetData()" class="btn-danger" style="margin-top:20px">HAPUS DATA</button>
+    </div>
+    
+    <div style="margin-top: 30px; border-top: 2px dashed #eee; padding-top: 20px;">
+            <h4 style="margin-bottom: 15px; color: var(--gold); display:flex; align-items:center; gap:10px;">
+                <span>📜</span> Riwayat Aktivitas
+            </h4>
+            <button onclick="resetRiwayat()" style="background:#ffebee; color:red; border:none; padding:5px 10px; border-radius:5px; font-size:10px; font-weight:bold;">RESET</button>
+            <div id="list-riwayat" style="max-height: 300px; overflow-y: auto;">
+                </div>
+        </div>
+</section>
+
+</main>
+
+
+
+<nav class="bottom-nav">
+    <div class="nav-btn active" onclick="switchPage('page-input', this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+        <p>Jual</p>
+    </div>
+    <div class="nav-btn" onclick="switchPage('page-masuk', this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
+        <p>Masuk</p>
+    </div>
+    <div class="nav-btn" onclick="switchPage('page-stok', this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>
+        <p>Stok</p>
+    </div>
+    <div class="nav-btn" onclick="switchPage('page-harian', this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
+        <p>Harian</p>
+    </div>
+    <div class="nav-btn" onclick="switchPage('page-bulanan', this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" x2="18" y1="20" y2="10"/><line x1="12" x2="12" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="14"/></svg>
+        <p>Laporan</p>
+    </div>
+    <div class="nav-btn" onclick="switchPage('page-set', this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+        <p>Set</p>
+    </div>
+</nav>
+
+<script src="script.js"></script>
+
+<div id="modal-overlay" class="modal-overlay">
+    <div class="modal-box">
+        <h3 id="modal-title">Judul</h3>
+        <div id="modal-content">Konten</div>
+        <div class="modal-actions" id="modal-footer">
+            </div>
+    </div>
+</div>
+
+<div id="progress-toast" class="toast">
+    <span class="spinner"></span>
+    <p id="toast-text">Memproses...</p>
+</div>
+
+</body>
+</html>
