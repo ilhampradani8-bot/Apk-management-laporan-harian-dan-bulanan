@@ -42,65 +42,6 @@ function loadProfil() {
     if(sSaldo) sSaldo.value = profil.saldoAwal;
 }
 
-function simpanProfil() {
-    profil.nama = document.getElementById('set-nama').value;
-    profil.alamat = document.getElementById('set-alamat').value;
-    profil.wa = document.getElementById('set-wa').value;
-    profil.saldoAwal = Number(document.getElementById('set-saldo-awal').value);
-    localStorage.setItem('egg_profil', JSON.stringify(profil));
-    alert("Profil Diperbarui!");
-    location.reload();
-}
-
-// Simpan Transaksi
-
-// Logika Tombol Jual di Halaman Kasir
-// GANTI BLOK TOMBOL JUAL INI:
-document.getElementById('btnSimpanJual').addEventListener('click', () => {
-    const tgl = document.getElementById('tgl').value;
-    const produkNama = document.getElementById('pilih-produk').value;
-    const qtyJual = Number(document.getElementById('jual_qty').value);
-    const hJual = Number(document.getElementById('harga_jual').value);
-    const checkboxPiutang = document.getElementById('is-piutang');
-    const isPiutang = checkboxPiutang ? checkboxPiutang.checked : false;
-
-    // 1. Validasi Modern (Ganti Alert)
-    if(!tgl || !produkNama || qtyJual <= 0) {
-        return openModal("Data Belum Lengkap", "Harap isi Tanggal, Produk, dan Jumlah dengan benar.");
-    }
-
-    // 2. Cek Stok
-    let index = stok_db.findIndex(s => s.produk === produkNama);
-    if(index === -1 || stok_db[index].qty < qtyJual) {
-        return openModal("Stok Kurang", `Stok <b>${produkNama}</b> saat ini tidak mencukupi untuk penjualan ini.`);
-    }
-
-    // 3. Konfirmasi Sebelum Simpan (Fitur Baru)
-    openModal("Konfirmasi Penjualan", 
-        `Jual <b>${qtyJual}kg ${produkNama}</b> seharga <b>Rp${hJual.toLocaleString()}</b>?<br>Total: <b>Rp${(qtyJual*hJual).toLocaleString()}</b>`, 
-        () => {
-            // Aksi Simpan (Dijalankan jika klik "Lanjutkan")
-            stok_db[index].qty -= qtyJual;
-            db.push({
-                tgl: tgl, beli_nama: '-', beli_qty: 0, uang_keluar: 0,
-                jual_nama: document.getElementById('jual_nama').value || 'Umum',
-                jual_qty: qtyJual, harga_jual: hJual, produk_terjual: produkNama, piutang: isPiutang
-            });
-
-            localStorage.setItem('egg_stok_db', JSON.stringify(stok_db));
-            localStorage.setItem('egg_db', JSON.stringify(db));
-
-            // Tampilkan Indikator Loading
-            showProgress("Menyimpan Transaksi...");
-            
-            setTimeout(() => {
-                renderHarian();
-                switchPage('page-harian', document.querySelectorAll('.nav-btn')[3]);
-            }, 1000); // Jeda sedikit biar terlihat keren
-        }
-    );
-});
-
 
 
 // Render Tabel Persis Excel
@@ -260,7 +201,336 @@ function renderBulanan() {
 
 
 
+// --- VARIABEL KERANJANG ---
+let keranjang = [];
 
+// --- 1. FUNGSI TAMBAH ITEM KE KERANJANG ---
+function tambahKeKeranjang() {
+    const tgl = document.getElementById('tgl').value;
+    const produkNama = document.getElementById('pilih-produk').value;
+    const qtyInput = document.getElementById('jual_qty').value;
+    const hJualInput = document.getElementById('harga_jual').value;
+
+    // Validasi Input Dasar
+    if (!tgl || !produkNama || qtyInput === "" || Number(qtyInput) <= 0) {
+        return openModal("Data Kurang", "Harap pilih produk dan isi jumlah (kg) dengan benar.");
+    }
+
+    const qty = Number(qtyInput);
+    const harga = Number(hJualInput);
+
+    // Cek Stok Database
+    let stokIdx = stok_db.findIndex(s => s.produk === produkNama);
+    if (stokIdx === -1) {
+        return openModal("Error", "Produk tidak ditemukan di database.");
+    }
+    
+    // Cek Stok Apakah Cukup (Termasuk yang sudah ada di keranjang)
+    let qtyDiKeranjang = 0;
+    keranjang.forEach(item => {
+        if(item.produk === produkNama) qtyDiKeranjang += item.qty;
+    });
+    
+    if (stok_db[stokIdx].qty < (qty + qtyDiKeranjang)) {
+        return openModal("Stok Kurang", `Sisa stok <b>${produkNama}</b> hanya ${stok_db[stokIdx].qty} kg.`);
+    }
+
+    // Masukkan ke Array Keranjang
+    keranjang.push({
+        id: new Date().getTime(), // ID Unik
+        produk: produkNama,
+        qty: qty,
+        harga: harga,
+        subtotal: qty * harga
+    });
+
+    renderKeranjang();
+    
+    // Reset input qty biar bisa input barang lain cepat
+    document.getElementById('jual_qty').value = '';
+    // document.getElementById('pilih-produk').focus(); // Opsional
+}
+
+// --- 2. FUNGSI RENDER TABEL KERANJANG ---
+function renderKeranjang() {
+    const body = document.getElementById('bodyKeranjang');
+    const txtTotal = document.getElementById('txtTotalBayar');
+    
+    if (!body) return; // Jaga-jaga kalau elemen belum ada
+
+    body.innerHTML = '';
+    let grandTotal = 0;
+
+    if (keranjang.length === 0) {
+        body.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:10px; color:#999;">Keranjang Kosong</td></tr>';
+        txtTotal.innerText = 'Rp 0';
+        return;
+    }
+
+// Di dalam loop renderKeranjang:
+    keranjang.forEach((item, index) => {
+        grandTotal += item.subtotal;
+        body.innerHTML += `
+            <tr>
+                <td class="col-produk-mod"><b>${item.produk}</b></td>
+                <td class="col-qty-mod">${item.qty}</td>
+                <td class="col-total-mod">Rp${item.subtotal.toLocaleString()}</td>
+                <td class="col-aksi-mod">
+                    <button onclick="hapusItemKeranjang(${index})" class="btn-del-mini">🗑️</button>
+                </td>
+            </tr>`;
+    });
+    
+
+    txtTotal.innerText = 'Rp ' + grandTotal.toLocaleString();
+}
+
+// --- 3. FUNGSI HAPUS ITEM DARI KERANJANG ---
+function hapusItemKeranjang(index) {
+    keranjang.splice(index, 1);
+    renderKeranjang();
+}
+
+function prosesBayar() {
+    if (keranjang.length === 0) return openModal("Keranjang Kosong", "Belum ada barang.");
+
+    const tgl = document.getElementById('tgl').value;
+    const jualNama = document.getElementById('jual_nama').value || 'Umum';
+    let totalBayar = 0;
+    keranjang.forEach(i => totalBayar += i.subtotal);
+    const isPiutang = document.getElementById('is-piutang').checked || false;
+
+    openModal("Konfirmasi Pembayaran", 
+        `Total: <b style="color:green;">Rp${totalBayar.toLocaleString()}</b><br>Items: ${keranjang.length}`, 
+        () => {
+            keranjang.forEach(item => {
+                let idx = stok_db.findIndex(s => s.produk === item.produk);
+                if(idx > -1) stok_db[idx].qty -= item.qty;
+
+                db.push({
+                    tgl: tgl, jual_nama: jualNama, jual_qty: item.qty, harga_jual: item.harga,
+                    produk_terjual: item.produk, beli_nama: '-', beli_qty: 0, uang_keluar: 0, piutang: isPiutang
+                });
+            });
+
+            // 1. CATAT KE RIWAYAT
+            catatLog(`🛒 Jual Keranjang: ${keranjang.length} item (Rp${totalBayar.toLocaleString()})`, tgl);
+
+            localStorage.setItem('egg_stok_db', JSON.stringify(stok_db));
+            localStorage.setItem('egg_db', JSON.stringify(db));
+
+            tampilkanStruk(keranjang, totalBayar, tgl, jualNama);
+
+            // 2. RESET PINTAR
+            keranjang = [];
+            renderKeranjang();
+            renderHarian(); 
+            // Tanggal tidak direset
+            document.getElementById('jual_nama').value = '';
+        }
+    );
+}
+
+// --- FITUR BARU: BAYAR LANGSUNG (SAT-SET) ---
+
+function bayarLangsung() {
+    const tgl = document.getElementById('tgl').value;
+    const produkNama = document.getElementById('pilih-produk').value;
+    const qtyInput = document.getElementById('jual_qty').value;
+    const hJualInput = document.getElementById('harga_jual').value;
+    const jualNama = document.getElementById('jual_nama').value || 'Umum';
+
+    if (!tgl || !produkNama || qtyInput === "" || Number(qtyInput) <= 0) {
+        return openModal("Data Kurang", "Harap pilih produk dan isi jumlah (kg).");
+    }
+
+    const qty = Number(qtyInput);
+    const harga = Number(hJualInput);
+    const total = qty * harga;
+
+    let stokIdx = stok_db.findIndex(s => s.produk === produkNama);
+    if (stokIdx === -1) return openModal("Error", "Produk tidak valid.");
+    if (stok_db[stokIdx].qty < qty) {
+        return openModal("Stok Kurang", `Sisa stok <b>${produkNama}</b> hanya ${stok_db[stokIdx].qty} kg.`);
+    }
+
+    openModal("Bayar Langsung", 
+        `Jual <b>${produkNama} (${qty}kg)</b>?<br>Total: <b style="color:green;">Rp${total.toLocaleString()}</b>`,
+        () => {
+            stok_db[stokIdx].qty -= qty;
+
+            const isPiutang = document.getElementById('is-piutang').checked;
+            db.push({
+                tgl: tgl, jual_nama: jualNama, jual_qty: qty, harga_jual: harga,
+                produk_terjual: produkNama, beli_nama: '-', beli_qty: 0, uang_keluar: 0, piutang: isPiutang
+            });
+
+            // 1. CATAT KE RIWAYAT (LOG)
+            catatLog(`💰 Jual Langsung: ${produkNama} (${qty}kg)`, tgl);
+
+            localStorage.setItem('egg_stok_db', JSON.stringify(stok_db));
+            localStorage.setItem('egg_db', JSON.stringify(db));
+
+            const keranjangMini = [{ produk: produkNama, qty: qty, harga: harga, subtotal: total }];
+            tampilkanStruk(keranjangMini, total, tgl, jualNama);
+            
+            // 2. RESET PINTAR (TANGGAL JANGAN DIHAPUS)
+            document.getElementById('jual_qty').value = '';
+            document.getElementById('jual_nama').value = '';
+            // document.getElementById('tgl').value = ''; <--- INI DIHAPUS BIAR TANGGAL TETAP
+            
+            renderHarian();
+            renderStokLengkap();
+        }
+    );
+}
+
+
+// --- FIX: FUNGSI AUTO HARGA ---
+function autoHarga() {
+    const namaProduk = document.getElementById('pilih-produk').value;
+    
+    // Cari produk di database stok
+    const item = stok_db.find(s => s.produk === namaProduk);
+    
+    if(item) {
+        // Isi otomatis harga jual dari database
+        document.getElementById('harga_jual').value = item.harga_jual;
+        
+        // Opsional: Fokuskan kursor ke kolom jumlah agar cepat
+        document.getElementById('jual_qty').focus();
+    } else {
+        document.getElementById('harga_jual').value = '';
+    }
+}
+
+
+// --- FITUR BARU: BAYAR LANGSUNG (TANPA KERANJANG) ---
+function bayarLangsung() {
+    const tgl = document.getElementById('tgl').value;
+    const produkNama = document.getElementById('pilih-produk').value;
+    const qtyInput = document.getElementById('jual_qty').value;
+    const hJualInput = document.getElementById('harga_jual').value;
+    const jualNama = document.getElementById('jual_nama').value || 'Umum';
+
+    // 1. Validasi Input
+    if (!tgl || !produkNama || qtyInput === "" || Number(qtyInput) <= 0) {
+        return openModal("Data Kurang", "Pilih produk dan isi jumlah (kg) dengan benar.");
+    }
+
+    const qty = Number(qtyInput);
+    const harga = Number(hJualInput);
+    const total = qty * harga;
+
+    // 2. Cek Stok
+    let stokIdx = stok_db.findIndex(s => s.produk === produkNama);
+    if (stokIdx === -1) return openModal("Error", "Produk tidak valid.");
+    if (stok_db[stokIdx].qty < qty) {
+        return openModal("Stok Kurang", `Sisa stok <b>${produkNama}</b> hanya ${stok_db[stokIdx].qty} kg.`);
+    }
+
+    // 3. Konfirmasi Langsung
+    openModal("Bayar Langsung", 
+        `Proses transaksi langsung?<br>
+         <b>${produkNama} (${qty}kg)</b><br>
+         Total: <b style="color:green; font-size:16px;">Rp${total.toLocaleString()}</b>`,
+        () => {
+            // A. Simpan ke Database
+            stok_db[stokIdx].qty -= qty; // Kurangi Stok
+
+            // Cek Piutang
+            const isPiutang = document.getElementById('is-piutang').checked;
+
+            const itemTransaksi = {
+                tgl: tgl,
+                jual_nama: jualNama,
+                jual_qty: qty,
+                harga_jual: harga,
+                produk_terjual: produkNama,
+                beli_nama: '-', beli_qty: 0, uang_keluar: 0,
+                piutang: isPiutang
+            };
+            db.push(itemTransaksi);
+
+            // B. Update Storage
+            localStorage.setItem('egg_stok_db', JSON.stringify(stok_db));
+            localStorage.setItem('egg_db', JSON.stringify(db));
+
+            // C. Buat Array Sementara Agar Struk Bisa Baca (Format Array)
+            const keranjangSementara = [{
+                produk: produkNama, qty: qty, harga: harga, subtotal: total
+            }];
+
+            // D. Tampilkan Struk & Update Tampilan
+            tampilkanStruk(keranjangSementara, total, tgl, jualNama);
+            
+            // Bersihkan Input
+            document.getElementById('jual_qty').value = '';
+            document.getElementById('jual_nama').value = '';
+            renderHarian();
+            renderStokLengkap();
+        }
+    );
+}
+
+// --- 5. UPDATE TAMPILKAN STRUK (UNTUK BANYAK BARANG) ---
+
+// --- UPDATE: TAMPILKAN STRUK (DATA DARI SETELAN) ---
+function tampilkanStruk(dataKeranjang, total, tgl, namaPelanggan) {
+    const modal = document.getElementById('modalStruk');
+    
+    // Safety Check: Pastikan elemen HTML ada
+    if(!document.getElementById('strukNamaToko')) {
+        alert("Eror: Kode HTML Struk belum dipasang di index.html!");
+        return;
+    }
+
+    // 1. Isi Header Struk dari Profil (Setelan)
+    document.getElementById('strukNamaToko').innerText = profil.nama || "TELUR BAROKAH";
+    document.getElementById('strukAlamat').innerText = profil.alamat || "-";
+    document.getElementById('strukWa').innerText = profil.wa ? "WA: " + profil.wa : "";
+
+    // 2. Info Transaksi
+    document.getElementById('strukTanggal').innerText = tgl;
+    document.getElementById('strukNo').innerText = "NO-" + new Date().getTime().toString().substr(-5);
+
+    // 3. Render List Belanja
+    const listDiv = document.getElementById('strukListBelanja');
+    listDiv.innerHTML = '';
+    
+    dataKeranjang.forEach(item => {
+        listDiv.innerHTML += `
+            <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                <span style="flex:1;">${item.produk}</span>
+                <span style="width:40px; text-align:right;">x${item.qty}</span>
+                <span style="width:80px; text-align:right;">${(item.subtotal).toLocaleString()}</span>
+            </div>`;
+    });
+    
+    // Total & Footer
+    document.getElementById('strukTotal').innerText = "Rp " + total.toLocaleString();
+    
+    // Munculkan Modal
+    modal.style.display = "flex";
+}
+
+
+// --- 6. UPDATE TUTUP STRUK (AGAR TETAP DI HALAMAN) ---
+function tutupStruk() {
+    document.getElementById('modalStruk').style.display = "none";
+    
+    // Reset Form Input agar siap untuk orang berikutnya
+    document.getElementById('jual_qty').value = '';
+    document.getElementById('jual_nama').value = '';
+    
+    // Opsional: Reset piutang ke default (tidak dicentang)
+    if(document.getElementById('is-piutang')) document.getElementById('is-piutang').checked = false;
+
+    showProgress("Transaksi Selesai. Siap Input Baru!");
+    
+    // PERHATIKAN: Kita TIDAK memanggil switchPage().
+    // Jadi layar tetap di halaman kasir.
+}
 
 // Fungsi Export Gambar Full (Persegi Panjang)
 
@@ -276,12 +546,45 @@ function filterKeHarian(bulanNama) {
 
 
 
+// --- UPDATE: SIMPAN PROFIL MODERN ---
+function simpanProfil() {
+    const namaBaru = document.getElementById('set-nama').value;
+    const alamatBaru = document.getElementById('set-alamat').value;
+    const waBaru = document.getElementById('set-wa').value;
+    const saldoBaru = document.getElementById('set-saldo-awal').value;
 
+    openModal("Simpan Pengaturan", 
+        `Simpan perubahan profil toko?<br>Nama Toko: <b>${namaBaru}</b>`, 
+        () => {
+            profil.nama = namaBaru;
+            profil.alamat = alamatBaru;
+            profil.wa = waBaru;
+            profil.saldoAwal = Number(saldoBaru);
+            
+            localStorage.setItem('egg_profil', JSON.stringify(profil));
+            
+            // Update Header di Halaman Utama Langsung
+            loadProfil(); 
+            showProgress("Profil Berhasil Disimpan!");
+        }
+    );
+}
+
+// --- UPDATE: RESET DATA MODERN ---
 function resetData() {
-    if(confirm("AWAS: Ini akan menghapus seluruh catatan transaksi!")) {
-        localStorage.removeItem('egg_db');
-        location.reload();
-    }
+    openModal("⚠️ HAPUS SEMUA DATA", 
+        `Apakah Anda yakin ingin menghapus <b>SELURUH DATA TRANSAKSI</b>?<br>
+         Stok barang dan Profil toko TIDAK akan terhapus.<br>
+         <b style="color:red;">Tindakan ini tidak bisa dibatalkan!</b>`, 
+        () => {
+            db = []; // Kosongkan database transaksi
+            localStorage.setItem('egg_db', JSON.stringify(db));
+            
+            renderHarian();
+            renderBulanan();
+            showProgress("Data Transaksi Telah Dihapus.");
+        }
+    );
 }
 
 // Inisialisasi awal saat aplikasi dibuka
@@ -299,23 +602,20 @@ function tambahStokMasuk() {
     const hJual = Number(document.getElementById('harga_jual_set').value);
 
     if(!tgl || !prod || qty <= 0) {
-        return openModal("Data Tidak Lengkap", "Mohon lengkapi Tanggal, Nama Produk, dan Jumlah (kg) pembelian.");
+        return openModal("Data Tidak Lengkap", "Lengkapi semua data pembelian.");
     }
 
-    // Hitung modal per kg
     const modalPerKg = modalTotal / qty;
 
-    // Simpan ke Riwayat Transaksi
     db.push({
         tgl: tgl, beli_nama: prod, beli_qty: qty, uang_keluar: modalTotal,
         jual_nama: '-', jual_qty: 0, harga_jual: 0
     });
 
-    // Update Data Stok
     let idx = stok_db.findIndex(s => s.produk.toLowerCase() === prod.toLowerCase());
     if(idx > -1) {
         stok_db[idx].qty += qty;
-        stok_db[idx].modal_per_kg = modalPerKg; // Update modal terbaru
+        stok_db[idx].modal_per_kg = modalPerKg;
         stok_db[idx].harga_jual = hJual;
     } else {
         stok_db.push({ 
@@ -324,15 +624,22 @@ function tambahStokMasuk() {
         });
     }
 
+    // 1. CATAT LOG
+    catatLog(`📦 Stok Masuk: ${prod} (${qty}kg)`, tgl);
+
     localStorage.setItem('egg_db', JSON.stringify(db));
     localStorage.setItem('egg_stok_db', JSON.stringify(stok_db));
     
     showProgress("Stok Berhasil Ditambah!");
-    // Reset form tanpa pindah halaman
-    document.querySelectorAll('#page-masuk input').forEach(i => i.value = '');
+    
+    // 2. RESET FORM (KECUALI TANGGAL)
+    document.getElementById('produk_masuk').value = '';
+    document.getElementById('qty_masuk').value = '';
+    document.getElementById('harga_modal').value = '';
+    // Tanggal masuk (tgl_masuk) dibiarkan tetap sesuai inputan terakhir
+    
     renderStokLengkap(); 
 }
-
 
 
 
@@ -412,25 +719,43 @@ function showProgress(text, duration = 2000) {
 // 2. Indikator Export Gambar/XLS
 
 function exportExcel(id, name) {
-    showProgress("Menyiapkan Excel...", 1500); // Muncul toast loading
+    showProgress("Membuat Excel...", 1500);
+    
     setTimeout(() => {
         const element = document.getElementById(id);
-        const wb = XLSX.utils.table_to_book(element);
-        XLSX.writeFile(wb, name + ".xlsx");
+        const wb = XLSX.utils.table_to_book(element, {sheet: "Laporan"});
+        // Mode Base64 standar
+        const wbout = XLSX.write(wb, {bookType:'xlsx', type:'base64'});
+        
+        const link = document.createElement('a');
+        const timestamp = new Date().getTime();
+        
+        link.href = "data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64," + wbout;
+        link.download = `${name}_${timestamp}.xlsx`;
+        
+        document.body.appendChild(link);
+        link.click();
+        
+        setTimeout(() => {
+            document.body.removeChild(link);
+        }, 1000);
     }, 500);
 }
 
-
 function exportGambar(id, name) {
-    showProgress("Merender Gambar...", 2000); 
+    showProgress("Merender Gambar HD...", 2000); 
 
     const element = document.getElementById(id);
     const originalWidth = element.scrollWidth;
     const originalHeight = element.scrollHeight;
 
+    // Kunci Scroll
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
     setTimeout(() => {
         html2canvas(element, {
-            scale: 2,
+            scale: 2, // KEMBALI KE HD
             useCORS: true,
             allowTaint: true,
             backgroundColor: "#ffffff",
@@ -450,33 +775,34 @@ function exportGambar(id, name) {
                 clonedDoc.querySelectorAll('[data-html2canvas-ignore]').forEach(el => el.style.display = 'none');
             }
         }).then(canvas => {
-            // --- TRIK KHUSUS APK ANDROID ---
-            // Ubah tipe file jadi 'octet-stream' agar Android tidak mencoba membacanya sebagai teks
-            const imgData = canvas.toDataURL("image/png", 1.0).replace("image/png", "application/octet-stream");
-            
-            const link = document.createElement('a');
-            const timestamp = new Date().getTime();
-            // Beri ekstensi .png secara manual di nama file
-            link.download = `${name}_${timestamp}.png`;
-            link.href = imgData;
-            
-            document.body.appendChild(link);
-            link.click();
-            
-            setTimeout(() => {
-                document.body.removeChild(link);
-            }, 1000);
+            // DOWNLOAD BIASA (CHROME PASTI BISA)
+            canvas.toBlob(function(blob) {
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                const timestamp = new Date().getTime();
+                
+                a.style.display = 'none';
+                a.href = url;
+                a.download = `${name}_${timestamp}.png`;
+                
+                document.body.appendChild(a);
+                a.click();
+                
+                setTimeout(() => {
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+                }, 1000);
+                
+                showProgress("✅ Gambar Tersimpan!");
+            }, 'image/png');
 
-            showProgress("✅ File Disimpan!");
-
+            document.body.style.overflow = originalOverflow;
         }).catch(err => {
-            console.error(err);
+            document.body.style.overflow = originalOverflow;
             openModal("Gagal", "Error: " + err);
         });
-    }, 100);
+    }, 200);
 }
-
-
 
 // 3. Edit Saldo Harian (Mengganti Prompt)
 function editSaldoAwal() {
@@ -641,27 +967,104 @@ function catatLog(aktivitas, tanggal) {
     renderRiwayat(); // Update tampilan
 }
 
+// ==========================================
+// 📜 FITUR RIWAYAT AKTIVITAS (LOG SYSTEM)
+// ==========================================
+
+// 1. Database Riwayat
+// --- FUNGSI NAVIGASI HALAMAN (WAJIB ADA) ---
+function switchPage(id, el) {
+    // 1. Sembunyikan semua halaman
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    // 2. Munculkan halaman target
+    const target = document.getElementById(id);
+    if(target) target.classList.add('active');
+    
+    // 3. Atur warna tombol menu bawah
+    if(el) {
+        document.querySelectorAll('.nav-btn').forEach(n => n.classList.remove('active'));
+        el.classList.add('active');
+    }
+
+    // 4. Render ulang data sesuai halaman agar selalu fresh
+    if(id === 'page-harian') renderHarian();
+    if(id === 'page-bulanan') renderBulanan();
+    if(id === 'page-stok') renderStokLengkap();
+    if(id === 'page-setelan') {
+        loadProfil();
+        renderRiwayat(); // Pastikan riwayat muncul saat buka pengaturan
+    }
+}
+// 2. Fungsi Mencatat Log (Dipanggil otomatis oleh sistem)
+function catatLog(aktivitas, tanggal) {
+    const waktu = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+    
+    // Tambah ke paling atas (Unshift)
+    log_db.unshift({
+        akt: aktivitas,
+        tgl: tanggal,
+        jam: waktu
+    });
+
+    // Batasi cuma simpan 50 riwayat terakhir (biar gak lemot)
+    if(log_db.length > 50) log_db.pop();
+    
+    // Simpan & Render
+    localStorage.setItem('egg_log', JSON.stringify(log_db));
+    renderRiwayat();
+}
+
+// 3. Fungsi Menampilkan Riwayat (Render)
 function renderRiwayat() {
     const container = document.getElementById('list-riwayat');
+    
+    // Safety Check: Kalau HTML belum dipasang, stop biar gak eror
     if(!container) return;
     
     container.innerHTML = '';
+
     if(log_db.length === 0) {
-        container.innerHTML = '<p style="text-align:center; color:#999; font-size:12px;">Belum ada aktivitas.</p>';
+        container.innerHTML = `
+            <div style="text-align:center; padding:20px; opacity:0.6;">
+                <span style="font-size:30px;">📭</span>
+                <p style="font-size:12px; margin-top:5px;">Belum ada aktivitas baru.</p>
+            </div>`;
         return;
     }
 
     log_db.forEach(log => {
+        // Tentukan ikon berdasarkan kata kunci
+        let icon = '📝';
+        if(log.akt.includes('Jual')) icon = '💰';
+        if(log.akt.includes('Masuk')) icon = '📦';
+        if(log.akt.includes('Hapus')) icon = '🗑️';
+        if(log.akt.includes('Lunas')) icon = '✅';
+
         container.innerHTML += `
-            <div style="border-bottom:1px solid #eee; padding: 10px 0; display:flex; justify-content:space-between; align-items:center;">
-                <div>
-                    <div style="font-weight:bold; font-size:13px; color:#333;">${log.akt}</div>
-                    <div style="font-size:10px; color:#888;">${log.tgl} • ${log.time}</div>
+            <div style="display:flex; gap:10px; padding:10px 0; border-bottom:1px solid #f0f0f0; align-items:center;">
+                <div style="font-size:18px;">${icon}</div>
+                <div style="flex:1;">
+                    <div style="font-size:13px; font-weight:500; color:#333;">${log.akt}</div>
+                    <div style="font-size:10px; color:#888;">${log.tgl} • Pukul ${log.jam}</div>
                 </div>
             </div>
         `;
     });
 }
+
+// 4. Hapus Riwayat
+function resetRiwayat() {
+    openModal("Bersihkan Riwayat", 
+        "Hapus semua catatan aktivitas? Data transaksi penjualan TIDAK akan terhapus.",
+        () => {
+            log_db = [];
+            localStorage.removeItem('egg_log');
+            renderRiwayat();
+            showProgress("Riwayat Bersih!");
+        }
+    );
+}
+
 
 function bayarUtang(index, event) {
     if(event) event.stopPropagation(); // Mencegah pemicu hapus baris
@@ -726,22 +1129,94 @@ function resetRiwayat() {
     );
 }
 
-// Tambahkan catatLog() juga di fungsi JUAL (btnSimpanJual)
-// Cari bagian db.push di btnSimpanJual dan tambahkan:
-// catatLog(`🛒 Terjual: ${produkNama} ${qtyJual}kg`, tgl);
 
-// Pastikan saat simpan JUAL tidak pindah halaman
-// Cari listener btnSimpanJual dan hapus baris switchPage di akhir fungsinya
 
-// Jalankan semua fungsi inisialisasi secara berurutan
+// --- FUNGSI PEMBANTU DOWNLOAD (Wajib Ada) ---
+// --- FUNGSI PENYELAMAT DOWNLOAD (VERSI FINAL) ---
+// --- FUNGSI PENYELAMAT DOWNLOAD (VERSI FINAL & STABIL) ---
+function saveAsFile(blob, filename) {
+    // 1. Buat alamat memori virtual (URL Pendek)
+    const url = window.URL.createObjectURL(blob);
+    
+    // 2. Buat elemen link tersembunyi
+    const a = document.createElement('a');
+    a.style.display = 'none';
+    a.href = url;
+    a.download = filename; // Ini yang memaksa nama file
+    
+    // 3. Pasang ke halaman, klik, lalu buang
+    document.body.appendChild(a);
+    a.click();
+    
+    // 4. Bersihkan memori setelah jeda aman
+    setTimeout(() => {
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+    }, 100);
+}
+
+
+// --- FITUR SHARE & PRINT (VERSI FINAL) ---
+
+function shareGambarStruk() {
+    showProgress("Menyiapkan Share...", 1000);
+    const element = document.getElementById('areaStruk');
+    
+    // Pastikan pakai html2canvas untuk foto struk
+    html2canvas(element, { scale: 2, backgroundColor: "#ffffff" }).then(canvas => {
+        canvas.toBlob(function(blob) {
+            // Cek fitur Share Bawaan HP
+            if (navigator.share && navigator.canShare) {
+                const file = new File([blob], "Struk_Belanja.png", { type: "image/png" });
+                
+                if (navigator.canShare({ files: [file] })) {
+                    navigator.share({
+                        files: [file],
+                        title: 'Struk Belanja',
+                        text: 'Terima kasih telah berbelanja di ' + (profil.nama || 'Toko Kami')
+                    }).catch((error) => console.log('Share dibatalkan', error));
+                } else {
+                    downloadStruk(); // Fallback
+                }
+            } else {
+                downloadStruk(); // Fallback HP Lama
+            }
+        }, 'image/png');
+    });
+}
+
+function downloadStruk() {
+    exportGambar('areaStruk', 'Struk_TelurBarokah');
+}
+
+function printPDF() {
+    const printContent = document.getElementById('areaStruk').innerHTML;
+    const originalContent = document.body.innerHTML;
+    document.body.innerHTML = "<div style='width:300px; margin:auto;'>" + printContent + "</div>";
+    window.print();
+    document.body.innerHTML = originalContent;
+    location.reload(); 
+}
+
+// --- INISIALISASI APLIKASI ---
 function initApp() {
     loadProfil();
     updateYearFilter();
-    renderStokLengkap(); // Mengisi dropdown produk
+    renderStokLengkap(); 
     renderHarian();
     renderBulanan();
-    renderRiwayat(); // <--- Tambahkan ini
+    renderRiwayat(); 
+    setTanggalOtomatis();
+    setTanggalOtomatis(); // Tanggal otomatis
+    renderRiwayat();
 }
 
-// Panggil fungsi inisialisasi
+function setTanggalOtomatis() {
+    const today = new Date().toISOString().split('T')[0];
+    // Hanya isi jika kosong (agar tidak menimpa pilihan user saat refresh)
+    if(!document.getElementById('tgl').value) document.getElementById('tgl').value = today;
+    if(!document.getElementById('tgl_masuk').value) document.getElementById('tgl_masuk').value = today;
+}
+
+// Jalankan Aplikasi
 initApp();

@@ -34,23 +34,99 @@
 
 <main>
     <section id="page-input" class="page active">
-        <div class="modern-card">
-            <h3>Kasir (Penjualan)</h3>
-<div class="form-grid">
-    <input type="date" id="tgl">
-    <select id="pilih-produk">
-        <option value="">-- Pilih Produk --</option>
-    </select>
-    <input type="text" id="jual_nama" placeholder="Nama Pembeli">
-    <input type="number" id="jual_qty" placeholder="Jumlah Jual (kg)">
-    <input type="number" id="harga_jual" placeholder="Harga Jual (Rp)">
-    <div class="input-box full" style="display: flex; align-items: center; gap: 10px; background: #fffde7; padding: 10px; border-radius: 8px;">
-        <input type="checkbox" id="is-piutang" style="width: 20px; margin: 0;">
-        <label for="is-piutang" style="font-weight: bold; color: #856404;">Tandai sebagai Piutang (Warna Kuning)</label>
+
+<div class="card" style="background: #f8f9fa; border:none; box-shadow:none;">
+    <div class="header" style="margin-bottom:20px;">
+        <h3 style="margin:0; font-weight:800; color:#333;">🛒 Kasir Modern</h3>
+        <p style="margin:5px 0 0 0; font-size:12px; color:#666;">Input transaksi penjualan</p>
+    </div>
+    
+    <div style="background: #fff; padding: 20px; border-radius: 15px; box-shadow: 0 5px 20px rgba(0,0,0,0.05); margin-bottom: 20px;">
+        <div class="form-row">
+            <div class="form-group">
+                <label style="font-weight:600;">Tanggal</label>
+                <input type="date" id="tgl" class="modern-input" style="margin:0; background:#f4f6f8;">
+            </div>
+            <div class="form-group">
+                <label style="font-weight:600;">Pelanggan</label>
+                <input type="text" id="jual_nama" class="modern-input" placeholder="Umum" style="margin:0; background:#f4f6f8;">
+            </div>
+        </div>
+
+        <div class="form-group" style="margin-top:15px;">
+            <label style="font-weight:600;">Pilih Produk</label>
+            <select id="pilih-produk" class="modern-input" onchange="autoHarga()" style="margin:0; background:#f4f6f8; font-size:15px;">
+                <option value="">-- Pilih Produk --</option>
+                </select>
+        </div>
+
+        <div class="form-row" style="margin-top:15px;">
+            <div class="form-group">
+                <label style="font-weight:600;">Jumlah (Kg)</label>
+                <input type="number" id="jual_qty" class="modern-input" placeholder="0" style="font-size:18px; font-weight:bold; color:#667eea; background:#f4f6f8;">
+            </div>
+            <div class="form-group">
+                <label style="font-weight:600;">Harga/kg</label>
+                <input type="number" id="harga_jual" class="modern-input" placeholder="0" style="background:#f4f6f8;">
+            </div>
+        </div>
+
+        <label class="toggle-container">
+            <label class="toggle-switch">
+                <input type="checkbox" id="is-piutang">
+                <span class="slider"></span>
+            </label>
+            <span class="toggle-label">Catat sebagai Piutang (Belum Lunas)</span>
+        </label>
+    </div>
+
+    <button onclick="bayarLangsung()" class="btn-direct-modern">
+        <span>⚡</span> PROSES BAYAR LANGSUNG
+    </button>
+
+    <div class="btn-grid-modern">
+        <button onclick="tambahKeKeranjang()" class="btn-modern btn-orange">
+            <span>➕</span> Tambah
+        </button>
+        <button onclick="prosesBayar()" class="btn-modern btn-green">
+            <span>🛒</span> Bayar Keranjang
+        </button>
+    </div>
+
+<div class="kasir-scroll-wrapper">
+    <table class="tabel-kasir-modern">
+        <thead>
+            <tr>
+                <th class="col-produk-mod">PRODUK</th>
+                <th class="col-qty-mod">KG</th>
+                <th class="col-total-mod">TOTAL (RP)</th>
+                <th class="col-aksi-mod">HAPUS</th>
+            </tr>
+        </thead>
+        <tbody id="bodyKeranjang">
+            <tr>
+                <td colspan="4" style="text-align:center; padding:20px; color:#aaa;">
+                    Keranjang Kosong
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<div style="background: #fff; margin-top:10px; padding: 15px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #eee;">
+    <span style="font-weight:600; color:#555;">Total Tagihan:</span>
+    <span id="txtTotalBayar" style="font-size: 18px; font-weight: 800; color: #2196F3;">Rp 0</span>
+</div>
+
+    
+    <div style="background: #fff; padding: 15px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
+        <span style="font-weight:600; color:#555;">Total Keranjang</span>
+        <span id="txtTotalBayar" style="font-size: 20px; font-weight: 800; color: #2196F3;">Rp 0</span>
     </div>
 </div>
-            <button id="btnSimpanJual" class="btn-primary">PROSES JUAL</button>
-        </div>
+
+
+
     </section>
 
     <section id="page-masuk" class="page">
@@ -65,6 +141,7 @@
                 <input type="number" id="harga_jual_set" placeholder="Harga Jual/kg">
             </div>
             <button onclick="tambahStokMasuk()" class="btn-primary">SIMPAN PEMBELIAN</button>
+            
         </div>
     </section>
 
@@ -171,36 +248,58 @@
     </div>
 </section>
 
-<section id="page-set" class="page">
-    <div class="modern-card">
-        <h3>Profil Usaha</h3>
-        <div class="form-grid">
-            <div class="input-box full">
-                <input type="text" id="set-nama" placeholder="Nama Toko">
-            </div>
-            <div class="input-box full">
-                <textarea id="set-alamat" placeholder="Alamat"></textarea>
-            </div>
-            <div class="input-box">
-                <input type="text" id="set-wa" placeholder="WhatsApp">
-            </div>
-            <div class="input-box">
-                <input type="number" id="set-saldo-awal" placeholder="Saldo Awal">
-            </div>
-        </div>
-        <button onclick="simpanProfil()" class="btn-primary">SIMPAN PROFIL</button>
-        <button onclick="resetData()" class="btn-danger" style="margin-top:20px">HAPUS DATA</button>
+
+<div id="page-setelan" class="page">
+    <div class="header">
+        <h2>⚙️ Pengaturan Toko</h2>
     </div>
-    
-    <div style="margin-top: 30px; border-top: 2px dashed #eee; padding-top: 20px;">
-            <h4 style="margin-bottom: 15px; color: var(--gold); display:flex; align-items:center; gap:10px;">
-                <span>📜</span> Riwayat Aktivitas
-            </h4>
-            <button onclick="resetRiwayat()" style="background:#ffebee; color:red; border:none; padding:5px 10px; border-radius:5px; font-size:10px; font-weight:bold;">RESET</button>
-            <div id="list-riwayat" style="max-height: 300px; overflow-y: auto;">
-                </div>
+    <div class="content">
+        
+        <div class="card">
+            <h3>Profil Toko (Untuk Header Struk)</h3>
+            <p style="font-size:12px; color:#666; margin-bottom:15px;">Data ini akan muncul di bagian atas struk belanja.</p>
+
+            <label>Nama Toko:</label>
+            <input type="text" id="set-nama" class="modern-input" placeholder="Contoh: Telur Barokah">
+
+            <label>Alamat Toko:</label>
+            <input type="text" id="set-alamat" class="modern-input" placeholder="Contoh: Jl. Mawar No. 10">
+
+            <label>Nomor WhatsApp (Untuk Footer):</label>
+            <input type="text" id="set-wa" class="modern-input" placeholder="Contoh: 0812xxxx">
+
+            <label>Saldo Awal Kas:</label>
+            <input type="number" id="set-saldo-awal" class="modern-input">
+
+            <button onclick="simpanProfil()" style="width:100%; background:#2196F3; color:white; padding:12px; border:none; border-radius:8px; font-weight:bold; font-size:14px; cursor:pointer;">
+                💾 SIMPAN PROFIL
+            </button>
         </div>
-</section>
+
+        <div class="card" style="border:1px solid #ffcdd2; background:#fff5f5;">
+            <h3 style="color:#d32f2f;">Zona Bahaya</h3>
+            <p style="font-size:12px; color:#555;">Hapus semua data transaksi jika ingin memulai pembukuan dari nol.</p>
+            <div class="card" style="margin-top:20px; border:1px solid #eee;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                <h3 style="margin:0;">📜 Riwayat Aktivitas</h3>
+                <button onclick="resetRiwayat()" style="background:none; border:none; color:red; font-size:11px; cursor:pointer;">
+                    Bersihkan
+                </button>
+            </div>
+            
+            <div id="list-riwayat" style="max-height: 300px; overflow-y: auto;">
+                <p style="text-align:center; color:#999; font-size:12px; padding:10px;">Memuat riwayat...</p>
+            </div>
+        </div>
+        
+            <button onclick="resetData()" style="width:100%; background:#d32f2f; color:white; padding:12px; border:none; border-radius:8px; font-weight:bold; cursor:pointer;">
+                🗑️ HAPUS SEMUA DATA TRANSAKSI
+            </button>
+        </div>
+
+        <br><br><br>
+    </div>
+</div>
 
 </main>
 
@@ -227,13 +326,55 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" x2="18" y1="20" y2="10"/><line x1="12" x2="12" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="14"/></svg>
         <p>Laporan</p>
     </div>
-    <div class="nav-btn" onclick="switchPage('page-set', this)">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
-        <p>Set</p>
-    </div>
+
+<div class="nav-btn" onclick="switchPage('page-setelan', this)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
+        <circle cx="12" cy="12" r="3"/>
+    </svg>
+    <p>Set</p>
+</div>
+
 </nav>
 
-<script src="script.js"></script>
+<div id="page-setelan" class="page">
+    <div class="header">
+        <h2>⚙️ Pengaturan</h2>
+    </div>
+    <div class="content">
+        <div class="card">
+            <h3>Profil Toko</h3>
+            <p style="font-size:12px; color:#666; margin-bottom:15px;">Data untuk header struk.</p>
+
+            <label>Nama Toko:</label>
+            <input type="text" id="set-nama" class="modern-input" placeholder="Nama Toko">
+
+            <label>Alamat:</label>
+            <input type="text" id="set-alamat" class="modern-input" placeholder="Alamat Singkat">
+
+            <label>WhatsApp:</label>
+            <input type="number" id="set-wa" class="modern-input" placeholder="08xx">
+
+            <label>Saldo Kas Awal:</label>
+            <input type="number" id="set-saldo-awal" class="modern-input">
+
+            <button onclick="simpanProfil()" style="width:100%; background:#2196F3; color:white; padding:12px; border:none; border-radius:8px; font-weight:bold; margin-top:10px;">
+                💾 SIMPAN
+            </button>
+        </div>
+
+        <div class="card" style="border:1px solid #ffcdd2; background:#fff5f5; margin-top:20px;">
+            <h3 style="color:#d32f2f;">Reset Data</h3>
+            <p style="font-size:12px; color:#555;">Hapus semua transaksi (mulai dari nol).</p>
+            <button onclick="resetData()" style="width:100%; background:#d32f2f; color:white; padding:12px; border:none; border-radius:8px; font-weight:bold;">
+                ⚠️ HAPUS SEMUA DATA
+            </button>
+        </div>
+        <br><br><br> </div>
+</div>
+
+
+
 
 <div id="modal-overlay" class="modal-overlay">
     <div class="modal-box">
@@ -249,5 +390,52 @@
     <p id="toast-text">Memproses...</p>
 </div>
 
+<div id="modalStruk" style="display:none; position:fixed; z-index:9999; left:0; top:0; width:100%; height:100%; overflow:auto; background-color:rgba(0,0,0,0.6); align-items:center; justify-content:center; padding-top: 20px;">
+    
+    <div style="background-color:#eee; margin:auto; padding:15px; border-radius: 10px; width:90%; max-width:360px;">
+        
+        <div id="areaStruk" style="background: white; padding: 20px 15px; font-family: 'Courier New', monospace; color: #000; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+            
+            <div style="text-align: center; margin-bottom: 10px;">
+                <h3 id="strukNamaToko" style="margin:0; text-transform:uppercase; font-size:18px; font-weight:bold;">NAMA TOKO</h3>
+                <p id="strukAlamat" style="font-size:11px; margin:2px 0; color:#555;">-</p>
+                <p id="strukWa" style="font-size:11px; margin:0; color:#555;">-</p>
+            </div>
+
+            <div style="border-bottom: 2px dashed #000; margin: 10px 0;"></div>
+
+            <div style="display: flex; justify-content: space-between; font-size: 11px;">
+                <span id="strukTanggal">-</span>
+                <span id="strukNo">-</span>
+            </div>
+            
+            <div style="border-bottom: 2px dashed #000; margin: 10px 0;"></div>
+
+            <div id="strukListBelanja" style="font-size: 12px; min-height: 30px;">
+                </div>
+
+            <div style="border-bottom: 2px dashed #000; margin: 10px 0;"></div>
+
+            <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: 16px; margin-top:5px;">
+                <span>TOTAL</span>
+                <span id="strukTotal">Rp 0</span>
+            </div>
+            
+            <br>
+            <div style="text-align: center; font-size: 10px;">
+                <p>Terima Kasih</p>
+            </div>
+        </div>
+
+        <div style="margin-top: 15px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+            <button onclick="shareGambarStruk()" style="grid-column: span 2; background:#25D366; color:white; padding:12px; border:none; border-radius:5px; font-weight:bold;">📱 Share WA (Gambar)</button>
+            <button onclick="downloadStruk()" style="background:#007bff; color:white; padding:10px; border:none; border-radius:5px;">⬇️ Download</button>
+            <button onclick="printPDF()" style="background:#6c757d; color:white; padding:10px; border:none; border-radius:5px;">🖨️ Print</button>
+            <button onclick="tutupStruk()" style="grid-column: span 2; background:#dc3545; color:white; padding:12px; border:none; border-radius:5px; font-weight:bold;">❌ Tutup / Baru</button>
+        </div>
+    </div>
+</div>
+
+<script src="script.js"></script>
 </body>
 </html>

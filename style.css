@@ -246,3 +246,214 @@ thead tr th {
     bottom: 70px; /* Posisi tetap */
     transition: transform 0.3s;
 }
+
+/* --- FIX TABEL KASIR (KHUSUS HP) --- */
+/* Kita buat kelas khusus biar Tabel Harian TIDAK RUSAK */
+
+.tabel-kasir {
+    width: 100% !important;
+    min-width: 0 !important; /* Membatalkan paksaan 1000px */
+    table-layout: fixed !important; /* Kolom penurut */
+    border: none !important;
+}
+
+.tabel-kasir th, .tabel-kasir td {
+    padding: 8px 2px !important; /* Jarak kiri-kanan rapat */
+    font-size: 12px !important;
+    border: none !important;
+    border-bottom: 1px solid #eee !important;
+    word-wrap: break-word; /* Teks turun ke bawah jika panjang */
+}
+
+/* PENGATURAN LEBAR KOLOM (Total 100%) */
+.col-produk { width: 40%; text-align: left; padding-left: 5px !important; }
+.col-qty    { width: 18%; text-align: center; } /* Ukuran pas buat angka */
+.col-total  { width: 30%; text-align: right; }
+.col-aksi   { width: 12%; text-align: center; }
+
+/* Agar Input Qty di dalam tabel tidak kepotong */
+.tabel-kasir input {
+    width: 100%;
+    text-align: center;
+    padding: 5px;
+}
+
+/* =========================================
+   🎨 UI/UX MODERN UPGRADE (KASIR)
+========================================= */
+
+/* --- 1. TOMBOL BAYAR LANGSUNG (SAT-SET) --- */
+.btn-direct-modern {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); /* Gradien Ungu-Biru */
+    color: white;
+    width: 100%;
+    padding: 15px;
+    border: none;
+    border-radius: 12px; /* Sudut lebih bulat */
+    font-weight: 700;
+    font-size: 16px;
+    letter-spacing: 0.5px;
+    margin-bottom: 15px;
+    box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4); /* Bayangan halus */
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+.btn-direct-modern:active {
+    transform: scale(0.98); /* Efek ditekan */
+    box-shadow: 0 2px 5px rgba(102, 126, 234, 0.4);
+}
+
+/* --- 2. TOMBOL KERANJANG MODERN (GRID) --- */
+.btn-grid-modern {
+    display: grid;
+    grid-template-columns: 1fr 1.5fr; /* Tombol Bayar lebih lebar */
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.btn-modern {
+    padding: 12px;
+    border: none;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+.btn-modern:active { transform: scale(0.97); }
+
+.btn-orange {
+    background: linear-gradient(135deg, #f09819 0%, #ff5858 100%); /* Gradien Oranye */
+    color: white;
+    box-shadow: 0 4px 10px rgba(240, 152, 25, 0.3);
+}
+.btn-green {
+    background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); /* Gradien Hijau */
+    color: white;
+    box-shadow: 0 4px 10px rgba(17, 153, 142, 0.3);
+}
+
+/* --- 3. TOGGLE SWITCH MODERN (PENGGANTI CHECKBOX PIUTANG) --- */
+.toggle-container {
+    display: flex;
+    align-items: center;
+    margin: 15px 0;
+    cursor: pointer;
+    background: #f0f2f5;
+    padding: 10px;
+    border-radius: 10px;
+}
+
+/* Sembunyikan checkbox asli */
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+/* Desain Slidernya */
+.slider {
+    position: relative;
+    display: inline-block;
+    width: 50px;
+    height: 26px;
+    background-color: #ccc;
+    border-radius: 34px;
+    transition: .4s;
+    margin-right: 12px;
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 20px;
+    width: 20px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    border-radius: 50%;
+    transition: .4s;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+/* Saat dicentang */
+input:checked + .slider {
+    background: linear-gradient(to right, #ff5f6d, #ffc371); /* Gradien Merah-Oranye untuk Piutang */
+}
+input:checked + .slider:before {
+    transform: translateX(24px);
+}
+
+.toggle-label {
+    font-weight: 600;
+    color: #555;
+    font-size: 14px;
+}
+
+
+/* =================================================
+   4. TABEL KASIR MODERN (MODE SCROLL / GESER)
+   ================================================= */
+
+/* Wadah Tabel (Bisa Geser Kanan-Kiri) */
+.kasir-scroll-wrapper {
+    width: 100%;
+    overflow-x: auto; /* INI KUNCINYA: Biar bisa digeser */
+    -webkit-overflow-scrolling: touch; /* Biar licin di HP */
+    background: white;
+    border: 1px solid #eee;
+    border-radius: 10px;
+    margin-top: 15px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+}
+
+/* Tabelnya Sendiri */
+.tabel-kasir-modern {
+    width: 100%;
+    min-width: 400px; /* Lebar minimal (agar kolom tidak gepeng) */
+    border-collapse: collapse;
+}
+
+/* Header & Sel */
+.tabel-kasir-modern th, .tabel-kasir-modern td {
+    padding: 10px 10px; /* Jarak secukupnya */
+    font-size: 13px;
+    white-space: nowrap; /* Teks dilarang turun baris (memanjang) */
+    border-bottom: 1px solid #f0f0f0;
+}
+
+/* Header Style */
+.tabel-kasir-modern thead th {
+    background: #f8f9fa;
+    color: #666;
+    font-weight: 700;
+    font-size: 11px;
+    text-transform: uppercase;
+}
+
+/* Kolom Spesifik */
+.col-produk-mod { text-align: left; }
+.col-qty-mod    { text-align: center; color: #667eea; font-weight: bold; }
+.col-total-mod  { text-align: right; }
+.col-aksi-mod   { text-align: center; width: 40px; }
+
+/* Tombol Hapus */
+.btn-del-mini {
+    background: #ffebee;
+    color: #d32f2f;
+    border: none;
+    padding: 6px 10px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 12px;
+}
