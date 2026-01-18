@@ -476,6 +476,7 @@ function bayarLangsung() {
 // --- 5. UPDATE TAMPILKAN STRUK (UNTUK BANYAK BARANG) ---
 
 // --- UPDATE: TAMPILKAN STRUK (DATA DARI SETELAN) ---
+// --- UPDATE: TAMPILKAN STRUK DENGAN HARGA SATUAN ---
 function tampilkanStruk(dataKeranjang, total, tgl, namaPelanggan) {
     const modal = document.getElementById('modalStruk');
     
@@ -485,29 +486,33 @@ function tampilkanStruk(dataKeranjang, total, tgl, namaPelanggan) {
         return;
     }
 
-    // 1. Isi Header Struk dari Profil (Setelan)
+    // 1. Isi Header Struk dari Profil
     document.getElementById('strukNamaToko').innerText = profil.nama || "TELUR BAROKAH";
     document.getElementById('strukAlamat').innerText = profil.alamat || "-";
     document.getElementById('strukWa').innerText = profil.wa ? "WA: " + profil.wa : "";
-
+    
     // 2. Info Transaksi
     document.getElementById('strukTanggal').innerText = tgl;
     document.getElementById('strukNo').innerText = "NO-" + new Date().getTime().toString().substr(-5);
 
-    // 3. Render List Belanja
+    // 3. Render List Belanja (FORMAT: Nama (@Harga) Qty Total)
     const listDiv = document.getElementById('strukListBelanja');
     listDiv.innerHTML = '';
     
     dataKeranjang.forEach(item => {
         listDiv.innerHTML += `
-            <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
-                <span style="flex:1;">${item.produk}</span>
-                <span style="width:40px; text-align:right;">x${item.qty}</span>
-                <span style="width:80px; text-align:right;">${(item.subtotal).toLocaleString()}</span>
+            <div style="margin-bottom: 8px; border-bottom: 1px dashed #eee; padding-bottom: 4px;">
+                <div style="display: flex; justify-content: space-between;">
+                    <span style="flex: 1; font-weight: bold; font-size: 12px;">${item.produk} (@${item.harga.toLocaleString()})</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 11px; color: #555; margin-top: 2px;">
+                    <span>Qty: ${item.qty} kg</span>
+                    <span style="font-weight: bold; color: #000;">Rp${(item.subtotal).toLocaleString()}</span>
+                </div>
             </div>`;
     });
-    
-    // Total & Footer
+
+    // 4. Total Akhir
     document.getElementById('strukTotal').innerText = "Rp " + total.toLocaleString();
     
     // Munculkan Modal
