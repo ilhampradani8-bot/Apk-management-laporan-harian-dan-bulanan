@@ -48,6 +48,7 @@ function loadProfil() {
 
 // 1. Fungsi Render Harian dengan Bulan Real-time
 
+// --- UPDATE: RENDER HARIAN (ANTI CRASH / KEBAL EROR) ---
 function renderHarian() {
     const body = document.getElementById('bodyHarian');
     const panelSaldo = document.getElementById('sticky-saldo');
@@ -57,11 +58,14 @@ function renderHarian() {
     const fBarang = document.getElementById('filter-barang').value;
 
     if (!body) return;
+    
+    // Bersihkan tabel dulu
+    body.innerHTML = '';
 
     // --- 1. Hitung Saldo Awal Cerdas ---
-    let saldoAwalShow = profil.saldoAwal;
+    let saldoAwalShow = profil.saldoAwal || 0;
     let labelMutasi = "Saldo Awal";
-    let akumulasiLalu = 0; // Pastikan variabel ini ada
+    let akumulasiLalu = 0;
 
     if (fMulai) {
         const d = new Date(fMulai);
@@ -70,8 +74,13 @@ function renderHarian() {
 
         db.forEach(item => {
             if (item.tgl < fMulai) {
-                const um = item.jual_qty * item.harga_jual;
-                akumulasiLalu += (um - item.uang_keluar);
+                // Gunakan || 0 agar tidak eror jika data null
+                const jQty = item.jual_qty || 0;
+                const hJual = item.harga_jual || 0;
+                const uKeluar = item.uang_keluar || 0;
+                
+                const um = jQty * hJual;
+                akumulasiLalu += (um - uKeluar);
             }
         });
         saldoAwalShow += akumulasiLalu;
@@ -98,8 +107,14 @@ function renderHarian() {
     const sortedDb = [...db].sort((a, b) => new Date(a.tgl) - new Date(b.tgl));
 
     sortedDb.forEach((item) => {
-        const uangMasuk = item.jual_qty * item.harga_jual;
-        const profit = uangMasuk - item.uang_keluar;
+        // SAFETY FIRST: Pastikan semua angka ada nilainya (tidak null)
+        const bQty = item.beli_qty || 0;
+        const jQty = item.jual_qty || 0;
+        const hJual = item.harga_jual || 0;
+        const uKeluar = item.uang_keluar || 0;
+        
+        const uangMasuk = jQty * hJual;
+        const profit = uangMasuk - uKeluar;
         const originalIndex = db.indexOf(item); 
 
         // Logika Filter
@@ -114,30 +129,31 @@ function renderHarian() {
         }
 
         if (passing) {
-             runningStok = (runningStok + item.beli_qty) - item.jual_qty;
-             runningSaldo = (runningSaldo + uangMasuk) - item.uang_keluar;
-             totalJualKg += item.jual_qty;
+             runningStok = (runningStok + bQty) - jQty;
+             runningSaldo = (runningSaldo + uangMasuk) - uKeluar;
+             totalJualKg += jQty;
              counter++;
 
-             // Logika Piutang
              const classPiutang = item.piutang ? 'bg-yellow' : '';
              const clickPiutang = item.piutang ? `onclick="bayarUtang(${originalIndex}, event)"` : '';
              const cursorStyle = item.piutang ? 'cursor:pointer' : '';
 
-             // RENDER BARIS (Perhatikan backtick ` di awal dan akhir blok ini)
+             // RENDER BARIS (Pakai || 0 di semua toLocaleString)
              body.innerHTML += `
                 <tr onclick="hapusTransaksi(${originalIndex})" style="cursor:pointer; transition:0.2s;">
                     <td>${item.tgl}</td>
-                    <td>${item.beli_nama || '-'}</td><td>${item.beli_qty || '-'}</td>
-                    <td>${item.jual_nama || '-'}</td><td>${item.jual_qty || '0'}</td>
+                    <td>${item.beli_nama || '-'}</td><td>${bQty || '-'}</td>
+                    <td>${item.jual_nama || '-'}</td><td>${jQty || '0'}</td>
                     <td>${runningStok}</td>
                     
                     <td class="${classPiutang}" ${clickPiutang} style="${cursorStyle}" title="${item.piutang ? 'Klik untuk LUNAS' : ''}">
-                        ${item.harga_jual > 0 ? 'Rp' + item.harga_jual.toLocaleString() : '-'}
+                        ${hJual > 0 ? 'Rp' + hJual.toLocaleString() : '-'}
                     </td>
                     
                     <td>Rp${uangMasuk.toLocaleString()}</td>
-                    <td>Rp${item.uang_keluar.toLocaleString()}</td>
+                    
+                    <td>Rp${(uKeluar || 0).toLocaleString()}</td>
+                    
                     <td class="${runningSaldo < 0 ? 'text-red' : ''}" style="font-weight:bold;">Rp${runningSaldo.toLocaleString()}</td>
                     <td class="${profit < 0 ? 'text-red' : ''}">${profit !== 0 ? 'Rp' + profit.toLocaleString() : '-'}</td>
                     <td>${(totalJualKg / counter || 0).toFixed(2)} kg</td>
@@ -152,8 +168,9 @@ function renderHarian() {
 }
 
 
-
 // 2. Fungsi Render Bulanan (Restored)
+
+// --- UPDATE: RENDER BULANAN (ANTI CRASH) ---
 function renderBulanan() {
     const body = document.getElementById('bodyBulanan');
     const foot = document.getElementById('footerBulanan');
@@ -163,16 +180,26 @@ function renderBulanan() {
     body.innerHTML = '';
     const rekap = {};
     const blns = ["JANUARI", "FEBRUARI", "MARET", "APRIL", "MEI", "JUNI", "JULI", "AGUSTUS", "SEPTEMBER", "OKTOBER", "NOVEMBER", "DESEMBER"];
+    
+    // Inisialisasi awal
     blns.forEach(b => rekap[b] = { m: 0, k: 0, uM: 0, uK: 0 });
 
     db.forEach(item => {
+        if (!item.tgl) return;
         const d = new Date(item.tgl);
         if(d.getFullYear().toString() === fTahun) {
             const bName = blns[d.getMonth()];
-            rekap[bName].m += item.beli_qty;
-            rekap[bName].k += item.jual_qty;
-            rekap[bName].uM += (item.jual_qty * item.harga_jual);
-            rekap[bName].uK += item.uang_keluar;
+            
+            // Gunakan || 0 untuk mencegah null
+            const bQty = item.beli_qty || 0;
+            const jQty = item.jual_qty || 0;
+            const hJual = item.harga_jual || 0;
+            const uKeluar = item.uang_keluar || 0;
+
+            rekap[bName].m += bQty;
+            rekap[bName].k += jQty;
+            rekap[bName].uM += (jQty * hJual);
+            rekap[bName].uK += uKeluar;
         }
     });
 
@@ -180,24 +207,38 @@ function renderBulanan() {
     blns.forEach(b => {
         const diff = rekap[b].m - rekap[b].k;
         const untung = rekap[b].uM - rekap[b].uK;
-        gTotal.m += rekap[b].m; gTotal.k += rekap[b].k;
-        gTotal.uM += rekap[b].uM; gTotal.uK += rekap[b].uK;
+        
+        gTotal.m += rekap[b].m; 
+        gTotal.k += rekap[b].k;
+        gTotal.uM += rekap[b].uM; 
+        gTotal.uK += rekap[b].uK;
 
         body.innerHTML += `
             <tr>
-                <td style="text-align:left">${b}</td>
-                <td>${rekap[b].m}</td><td>${rekap[b].k}</td><td>${diff}</td>
-                <td>Rp${rekap[b].uM.toLocaleString()}</td>
-                <td>Rp${rekap[b].uK.toLocaleString()}</td>
-                <td class="${untung < 0 ? 'text-red' : ''}">Rp${untung.toLocaleString()}</td>
+                <td style="text-align:left; font-weight:bold;">${b}</td>
+                <td>${rekap[b].m || 0}</td>
+                <td>${rekap[b].k || 0}</td>
+                <td>${diff || 0}</td>
+                <td>Rp${(rekap[b].uM || 0).toLocaleString()}</td>
+                <td>Rp${(rekap[b].uK || 0).toLocaleString()}</td>
+                <td style="color:${untung < 0 ? 'red' : 'green'}; font-weight:bold;">
+                    Rp${(untung || 0).toLocaleString()}
+                </td>
             </tr>`;
     });
 
-    foot.innerHTML = `
-        <td>TOTAL</td><td>${gTotal.m}</td><td>${gTotal.k}</td><td>${gTotal.m - gTotal.k}</td>
-        <td>Rp${gTotal.uM.toLocaleString()}</td><td>Rp${gTotal.uK.toLocaleString()}</td>
-        <td>Rp${(gTotal.uM - gTotal.uK).toLocaleString()}</td>`;
+    if(foot) {
+        foot.innerHTML = `
+            <td style="font-weight:bold; background:#eee;">TOTAL</td>
+            <td style="background:#eee;">${gTotal.m}</td>
+            <td style="background:#eee;">${gTotal.k}</td>
+            <td style="background:#eee;">${gTotal.m - gTotal.k}</td>
+            <td style="background:#eee;">Rp${gTotal.uM.toLocaleString()}</td>
+            <td style="background:#eee;">Rp${gTotal.uK.toLocaleString()}</td>
+            <td style="background:#eee; font-weight:bold;">Rp${(gTotal.uM - gTotal.uK).toLocaleString()}</td>`;
+    }
 }
+
 
 
 
@@ -723,13 +764,20 @@ function showProgress(text, duration = 2000) {
 
 // 2. Indikator Export Gambar/XLS
 
+// --- UPDATE: EXPORT EXCEL DENGAN FREEZE HEADER ---
 function exportExcel(id, name) {
     showProgress("Membuat Excel...", 1500);
     
     setTimeout(() => {
         const element = document.getElementById(id);
         const wb = XLSX.utils.table_to_book(element, {sheet: "Laporan"});
-        // Mode Base64 standar
+        const ws = wb.Sheets["Laporan"];
+
+        // FITUR BARU: FREEZE HEADER (Bekukan Baris Header)
+        // ySplit: 3 artinya baris 1-3 (Header) akan diam saat di-scroll
+        if(!ws['!views']) ws['!views'] = [];
+        ws['!views'].push({ state: 'frozen', xSplit: 0, ySplit: 3 });
+
         const wbout = XLSX.write(wb, {bookType:'xlsx', type:'base64'});
         
         const link = document.createElement('a');
@@ -747,67 +795,61 @@ function exportExcel(id, name) {
     }, 500);
 }
 
+
+
+
 function exportGambar(id, name) {
-    showProgress("Merender Gambar HD...", 2000); 
+    showProgress("Merender Gambar Full...", 2500); 
 
-    const element = document.getElementById(id);
-    const originalWidth = element.scrollWidth;
-    const originalHeight = element.scrollHeight;
+    const element = document.getElementById(id); 
+    if (!element) {
+        alert("Eror: Area gambar tidak ditemukan!");
+        return;
+    }
 
-    // Kunci Scroll
-    const originalOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
+    // Cari tabel di dalam elemen tersebut
+    const table = element.querySelector('table') || element;
+
+    // Matikan mode scroll dan freeze agar foto tidak terpotong layar HP
+    element.classList.add('full-height-capture'); 
+    element.classList.add('no-sticky'); 
 
     setTimeout(() => {
-        html2canvas(element, {
-            scale: 2, // KEMBALI KE HD
+        html2canvas(table, {
+            scale: 2, // Kualitas HD
             useCORS: true,
-            allowTaint: true,
             backgroundColor: "#ffffff",
-            width: originalWidth,
-            height: originalHeight,
-            windowWidth: originalWidth,
-            windowHeight: originalHeight,
-            scrollX: 0,
-            scrollY: -window.scrollY,
-            onclone: (clonedDoc) => {
-                const clonedEl = clonedDoc.getElementById(id);
-                if(clonedEl) {
-                    clonedEl.style.width = originalWidth + "px";
-                    clonedEl.style.height = originalHeight + "px";
-                    clonedEl.style.overflow = "visible"; 
-                }
-                clonedDoc.querySelectorAll('[data-html2canvas-ignore]').forEach(el => el.style.display = 'none');
-            }
+            // Paksa ukuran sesuai lebar asli tabel agar tidak gepeng
+            width: table.scrollWidth,
+            height: table.scrollHeight
         }).then(canvas => {
-            // DOWNLOAD BIASA (CHROME PASTI BISA)
+            // Kembalikan tampilan HP ke normal
+            element.classList.remove('full-height-capture');
+            element.classList.remove('no-sticky');
+
             canvas.toBlob(function(blob) {
                 const url = window.URL.createObjectURL(blob);
                 const a = document.createElement('a');
-                const timestamp = new Date().getTime();
-                
-                a.style.display = 'none';
                 a.href = url;
-                a.download = `${name}_${timestamp}.png`;
-                
+                a.download = `${name}_${new Date().getTime()}.png`;
                 document.body.appendChild(a);
                 a.click();
-                
-                setTimeout(() => {
-                    document.body.removeChild(a);
+                setTimeout(() => { 
+                    document.body.removeChild(a); 
                     window.URL.revokeObjectURL(url);
                 }, 1000);
-                
-                showProgress("✅ Gambar Tersimpan!");
             }, 'image/png');
-
-            document.body.style.overflow = originalOverflow;
+            
+            showProgress("✅ Berhasil Export!");
         }).catch(err => {
-            document.body.style.overflow = originalOverflow;
-            openModal("Gagal", "Error: " + err);
+            element.classList.remove('full-height-capture');
+            element.classList.remove('no-sticky');
+            alert("Gagal export: " + err);
         });
-    }, 200);
+    }, 500); 
 }
+
+
 
 // 3. Edit Saldo Harian (Mengganti Prompt)
 function editSaldoAwal() {
@@ -1204,17 +1246,6 @@ function printPDF() {
 }
 
 // --- INISIALISASI APLIKASI ---
-function initApp() {
-    loadProfil();
-    updateYearFilter();
-    renderStokLengkap(); 
-    renderHarian();
-    renderBulanan();
-    renderRiwayat(); 
-    setTanggalOtomatis();
-    setTanggalOtomatis(); // Tanggal otomatis
-    renderRiwayat();
-}
 
 function setTanggalOtomatis() {
     const today = new Date().toISOString().split('T')[0];
@@ -1223,5 +1254,308 @@ function setTanggalOtomatis() {
     if(!document.getElementById('tgl_masuk').value) document.getElementById('tgl_masuk').value = today;
 }
 
+
+
+// --- UPDATE: INIT APP (Tanggal Otomatis) ---
+function initApp() {
+    loadProfil();
+    updateYearFilter();
+    renderStokLengkap(); 
+    renderHarian();
+    renderBulanan();
+    renderRiwayat();
+    
+    // SET TANGGAL OTOMATIS (HARI INI)
+    const today = new Date().toISOString().split('T')[0];
+    
+    // Set di Filter Harian
+    const fMulai = document.getElementById('filter-tgl-mulai');
+    const fAkhir = document.getElementById('filter-tgl-akhir');
+    if(fMulai && !fMulai.value) fMulai.value = today;
+    if(fAkhir && !fAkhir.value) fAkhir.value = today;
+
+    // Set di Input Jual & Beli (jika masih kosong)
+    const tglJual = document.getElementById('tgl');
+    const tglBeli = document.getElementById('tgl_masuk');
+    if(tglJual && !tglJual.value) tglJual.value = today;
+    if(tglBeli && !tglBeli.value) tglBeli.value = today;
+    
+    // Refresh Harian agar langsung menampilkan data hari ini
+    renderHarian();
+}
+
 // Jalankan Aplikasi
 initApp();
+
+// --- FUNGSI DARURAT: PERBAIKI DATA RUSAK (NaN & TANGGAL EXCEL) ---
+function perbaikiData() {
+    let fixCount = 0;
+    
+    db = db.map(item => {
+        // 1. Ubah NaN menjadi 0
+        if (isNaN(item.jual_qty)) item.jual_qty = 0;
+        if (isNaN(item.beli_qty)) item.beli_qty = 0;
+        if (isNaN(item.harga_jual)) item.harga_jual = 0;
+        if (isNaN(item.uang_keluar)) item.uang_keluar = 0;
+
+        // 2. Ubah Tanggal Excel (46040) jadi Tanggal Biasa
+        // Cek jika tanggalnya berupa angka (misal 46040)
+        if (typeof item.tgl === 'number' || (typeof item.tgl === 'string' && !item.tgl.includes('-'))) {
+             const serial = Number(item.tgl);
+             if (!isNaN(serial) && serial > 10000) { // Pastikan angka valid
+                 const utc_days  = Math.floor(serial - 25569);
+                 const date_info = new Date(utc_days * 86400 * 1000);
+                 const y = date_info.getFullYear();
+                 const m = String(date_info.getMonth() + 1).padStart(2, '0');
+                 const d = String(date_info.getDate()).padStart(2, '0');
+                 item.tgl = `${y}-${m}-${d}`;
+                 fixCount++;
+             }
+        }
+        return item;
+    });
+
+    localStorage.setItem('egg_db', JSON.stringify(db));
+    
+    renderHarian();
+}
+
+// Panggil otomatis sekali saat script dimuat untuk membereskan masalahmu sekarang
+perbaikiData();
+
+// ===========================================
+// 🛠️ PERBAIKAN FITUR IMPORT & EXPORT
+// ===========================================
+
+// 1. FUNGSI IMPORT EXCEL (SOLUSI EROR 'NOT DEFINED')
+// --- UPDATE FIX: IMPORT EXCEL (ANTI CRASH & LEBIH PINTAR) ---
+function importExcel(input) {
+    const file = input.files[0];
+    if(!file) return;
+
+    showProgress("Membaca File Excel...", 1000);
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const data = e.target.result;
+        
+        const workbook = XLSX.read(data, {type: 'binary'});
+        const sheetName = workbook.SheetNames[0];
+        const sheet = workbook.Sheets[sheetName];
+
+        // Baca data mulai baris ke-4 (Index 3)
+        const jsonData = XLSX.utils.sheet_to_json(sheet, {header: 1, range: 3});
+
+        if(jsonData.length === 0) {
+            alert("File Excel kosong!");
+            return;
+        }
+
+        // --- HELPER: KONVERSI TANGGAL YANG LEBIH KUAT (ROBUST) ---
+        const excelDateToJS = (serial) => {
+            // 1. Jika kosong, anggap tidak valid
+            if (!serial) return null;
+
+            // 2. Jika sudah berupa teks tanggal "2024-01-01"
+            if (typeof serial === 'string' && serial.includes('-')) return serial;
+
+            // 3. Coba ubah jadi angka (misal: 46040)
+            const num = Number(serial);
+            
+            // Jika hasilnya NaN (Bukan Angka), berarti ini Teks Header/Saldo -> KEMBALIKAN NULL
+            if (isNaN(num)) return null;
+
+            // 4. Konversi Angka Excel ke Tanggal JS
+            const utc_days  = Math.floor(num - 25569);
+            const date_info = new Date(utc_days * 86400 * 1000);
+
+            // Cek apakah hasil tanggalnya valid
+            if (isNaN(date_info.getTime())) return null;
+
+            return date_info.toISOString().split('T')[0];
+        };
+
+        const cleanNum = (val) => {
+            if (!val) return 0;
+            const str = val.toString();
+            // Abaikan strip atau string kosong
+            if (str.trim() === '-' || str.trim() === '') return 0; 
+            // Ambil hanya angka, titik, dan minus (jika ada rugi)
+            const cleaned = str.replace(/[^0-9.-]/g, ""); 
+            return cleaned ? Number(cleaned) : 0;
+        };
+
+        // --- FILTER DATA VALID DULU ---
+        // Kita hanya hitung baris yang tanggalnya valid
+        let validRows = [];
+        jsonData.forEach(row => {
+            const tglFixed = excelDateToJS(row[0]);
+            if(tglFixed) { // Cuma ambil kalau tanggalnya sukses dikonversi
+                row._tglFixed = tglFixed; // Simpan hasil konversi biar gak hitung 2x
+                validRows.push(row);
+            }
+        });
+
+        openModal("Konfirmasi Import", 
+            `Ditemukan <b>${validRows.length} data transaksi valid</b>.<br>(Baris header/saldo akan dilewati otomatis).<br>Lanjutkan import?`,
+            () => {
+                let count = 0;
+                validRows.forEach(row => {
+                    db.push({
+                        tgl: row._tglFixed, // Pakai tanggal yang sudah dicek tadi
+                        beli_nama: row[1] || '-',
+                        beli_qty: cleanNum(row[2]),
+                        jual_nama: row[3] || '-',
+                        jual_qty: cleanNum(row[4]),
+                        produk_terjual: row[3] || 'Produk Import',
+                        harga_jual: cleanNum(row[6]),
+                        uang_keluar: cleanNum(row[8]),
+                        piutang: false
+                    });
+                    count++;
+                });
+
+                localStorage.setItem('egg_db', JSON.stringify(db));
+                // Matikan perbaikiData() karena sudah difilter di awal
+                renderHarian();
+                renderStokLengkap();
+                showProgress(`Berhasil import ${count} data!`);
+            }
+        );
+        input.value = ''; // Reset input file
+    };
+    reader.readAsBinaryString(file);
+}
+
+
+// 2. FUNGSI EXPORT EXCEL (FREEZE HEADER DI FILE XLS)
+function exportExcel(id, name) {
+    showProgress("Download Excel...", 1500);
+    
+    setTimeout(() => {
+        const element = document.getElementById(id);
+        const wb = XLSX.utils.table_to_book(element, {sheet: "Laporan"});
+        const ws = wb.Sheets["Laporan"];
+
+        // TRIK FREEZE HEADER DI FILE EXCEL ASLI
+        // Baris 0, 1, 2 (Total 3 baris header) akan beku
+        if(!ws['!views']) ws['!views'] = [];
+        ws['!views'].push({ state: 'frozen', xSplit: 0, ySplit: 3 });
+
+        const wbout = XLSX.write(wb, {bookType:'xlsx', type:'base64'});
+        const link = document.createElement('a');
+        const timestamp = new Date().getTime();
+        
+        link.href = "data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64," + wbout;
+        link.download = `${name}_${timestamp}.xlsx`;
+        
+        document.body.appendChild(link);
+        link.click();
+        setTimeout(() => { document.body.removeChild(link); }, 1000);
+    }, 500);
+}
+
+// 3. PEMBERSIH DATA (AUTO RUN)
+function perbaikiData() {
+    db = db.map(item => {
+        if (isNaN(item.jual_qty)) item.jual_qty = 0;
+        if (isNaN(item.uang_keluar)) item.uang_keluar = 0;
+        if (typeof item.tgl === 'number') { // Fix Tanggal Angka
+             const d = new Date((item.tgl - 25569) * 86400 * 1000);
+             item.tgl = d.toISOString().split('T')[0];
+        }
+        return item;
+    });
+    localStorage.setItem('egg_db', JSON.stringify(db));
+}
+
+// ==========================================
+// 🛡️ FITUR BACKUP & RESTORE (JSON SYSTEM)
+// ==========================================
+
+// 1. FUNGSI BACKUP (Download Semua Data)
+function backupData() {
+    showProgress("Menyiapkan file cadangan...", 1500);
+    
+    // Satukan semua database ke dalam satu objek
+    const fullBackup = {
+        transaksi: db,
+        stok: stok_db,
+        profil: profil,
+        riwayat: log_db,
+        version: "1.0",
+        date: new Date().toLocaleString()
+    };
+
+    // Ubah jadi teks JSON
+    const dataStr = JSON.stringify(fullBackup, null, 2);
+    const blob = new Blob([dataStr], { type: "application/json" });
+    
+    // Gunakan fungsi penyelamat download yang sudah kita buat sebelumnya
+    const timestamp = new Date().toISOString().split('T')[0];
+    saveAsFile(blob, `BACKUP_TELURBAROKAH_${timestamp}.json`);
+    
+    showProgress("✅ Backup Berhasil Diunduh!");
+}
+
+// 2. FUNGSI RESTORE (Tambah Data dari Backup)
+function restoreData(input) {
+    const file = input.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const dataImport = JSON.parse(e.target.result);
+
+            // Validasi sederhana apakah ini file backup Telur Barokah
+            if (!dataImport.transaksi || !dataImport.stok) {
+                throw new Error("Format file backup tidak dikenali!");
+            }
+
+            const jmlBaru = dataImport.transaksi.length;
+
+            openModal("Konfirmasi Import", 
+                `Apakah Anda ingin MENAMBAHKAN <b>${jmlBaru} data transaksi</b> dan memperbarui database?<br><br>
+                <i>*Catatan: Data baru akan digabungkan dengan data yang sudah ada.</i>`,
+                () => {
+                    // A. Gabungkan Transaksi (Append)
+                    db = [...db, ...dataImport.transaksi];
+                    
+                    // B. Gabungkan Riwayat (Append)
+                    if(dataImport.riwayat) {
+                        log_db = [...log_db, ...dataImport.riwayat];
+                    }
+
+                    // C. Update Stok & Profil (Timpa dengan yang terbaru jika perlu)
+                    // Untuk stok, kita pilih yang jumlahnya lebih banyak atau timpa saja
+                    if(dataImport.stok.length > 0) {
+                        stok_db = dataImport.stok; 
+                    }
+                    if(dataImport.profil) {
+                        profil = dataImport.profil;
+                    }
+
+                    // D. Simpan ke LocalStorage
+                    localStorage.setItem('egg_db', JSON.stringify(db));
+                    localStorage.setItem('egg_stok_db', JSON.stringify(stok_db));
+                    localStorage.setItem('egg_profil', JSON.stringify(profil));
+                    localStorage.setItem('egg_log', JSON.stringify(log_db));
+
+                    // E. Refresh Semua Tampilan
+                    loadProfil();
+                    renderHarian();
+                    renderStokLengkap();
+                    renderRiwayat();
+                    renderBulanan(); // Fix error bulanan juga
+
+                    showProgress("🚀 Data Berhasil Digabungkan!");
+                }
+            );
+        } catch (err) {
+            alert("Gagal membaca file: " + err.message);
+        }
+        input.value = ''; // Reset input
+    };
+    reader.readAsText(file);
+}

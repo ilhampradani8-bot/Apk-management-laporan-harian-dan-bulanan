@@ -457,3 +457,229 @@ input:checked + .slider:before {
     cursor: pointer;
     font-size: 12px;
 }
+
+/* --- FREEZE HEADER (BEKU SAAT SCROLL) --- */
+/* Berlaku untuk tabel Harian & Stok */
+.excel-container {
+    max-height: 70vh; /* Batasi tinggi tabel biar bisa di-scroll */
+    overflow-y: auto;
+}
+
+thead th {
+    position: sticky;
+    top: 0;
+    z-index: 10; /* Pastikan di atas data */
+    background: #d9d9d9; /* Wajib ada warna background biar gak transparan */
+    box-shadow: 0 2px 2px rgba(0,0,0,0.1); /* Bayangan biar cakep */
+}
+
+/* Kelas khusus untuk mematikan sticky saat Export Gambar */
+.no-sticky thead th {
+    position: static !important;
+    box-shadow: none !important;
+}
+
+/* --- 1. FREEZE HEADER (HEADER TETAP DI ATAS SAAT SCROLL) --- */
+.excel-container {
+    max-height: 65vh; /* Batasi tinggi tabel (65% layar) */
+    overflow-y: auto; /* Aktifkan scroll vertikal */
+    border: 1px solid #000;
+    position: relative;
+}
+
+/* Header Tabel */
+.excel-container thead th {
+    position: sticky; /* KUNCI UTAMA: Biar nempel */
+    top: 0;
+    z-index: 10;
+    background-color: #d9d9d9; /* Warna abu-abu Excel */
+    border-bottom: 2px solid #000; /* Garis bawah tegas */
+    box-shadow: 0 2px 2px rgba(0,0,0,0.1); /* Bayangan sedikit biar cantik */
+}
+
+/* --- 2. PERKECIL INPUT FILTER HARIAN --- */
+/* Target khusus area filter di Halaman Harian */
+#page-harian .form-grid {
+    display: flex; /* Jejerkan ke samping */
+    gap: 5px; /* Jarak antar input rapat */
+    margin-bottom: 5px;
+}
+
+#page-harian input[type="date"], 
+#page-harian select {
+    padding: 6px 4px !important; /* Padding kecil */
+    font-size: 11px !important; /* Huruf kecil */
+    height: 32px; /* Tinggi pas */
+    border-radius: 4px;
+}
+
+/* Atur lebar masing-masing */
+#filter-tgl-mulai, #filter-tgl-akhir {
+    flex: 1; /* Lebar seimbang */
+}
+#filter-barang {
+    flex: 1.5; /* Filter barang agak lebar dikit */
+}
+
+/* --- PERBAIKAN TAMPILAN HARIAN (VERSI STABIL) --- */
+
+/* 1. KECILKAN AREA FILTER (Supaya Hemat Tempat) */
+.filter-mini {
+    display: flex;
+    gap: 5px;
+    padding: 5px;
+    background: #f0f0f0;
+    border-radius: 8px;
+    margin-bottom: 5px;
+    align-items: center;
+}
+
+.filter-mini input, 
+.filter-mini select {
+    flex: 1; /* Bagi rata lebarnya */
+    padding: 6px 2px !important;
+    font-size: 11px !important; /* Huruf kecil */
+    height: 32px; /* Tinggi input dipangkas */
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background: white;
+}
+
+/* 2. FREEZE HEADER TABEL (Scroll di dalam kotak) */
+.excel-scroll {
+    /* Tinggi tabel dibatasi 60% layar HP, sisanya buat filter & nav */
+    height: 60vh; 
+    overflow-y: auto; /* Scroll Vertikal Aktif */
+    overflow-x: auto; /* Scroll Horizontal Aktif */
+    border: 1px solid #000;
+    background: #fff;
+    position: relative; /* Wajib untuk sticky */
+}
+
+/* Header Tabel Nempel di Atas Kotak */
+.excel-scroll thead th {
+    position: sticky;
+    top: 0;
+    z-index: 10; /* Pastikan di atas data */
+    background-color: #d9d9d9; /* Abu-abu Excel */
+    border-bottom: 2px solid #000;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* Trik: Saat Export Gambar, matikan limit tinggi biar ke-foto semua */
+.full-height {
+    height: auto !important;
+    overflow: visible !important;
+}
+
+/* --- FREEZE HEADER KHUSUS PAGE HARIAN --- */
+
+/* 1. Pembungkus Tabel (Wadah Scroll) */
+.harian-scroll-area {
+    /* Tinggi tabel dibatasi 60% dari layar HP */
+    /* Sisanya buat tempat Header Aplikasi + Filter + Navigasi Bawah */
+    height: 60vh; 
+    overflow-y: auto; /* Scroll Vertikal Aktif */
+    overflow-x: auto; /* Scroll Horizontal Aktif (jika tabel lebar) */
+    border: 1px solid #aaa;
+    background: #fff;
+    
+    /* Penting untuk posisi sticky */
+    position: relative; 
+    margin-top: 5px;
+}
+
+/* 2. Header Tabel (Yang akan membeku) */
+.harian-scroll-area thead th {
+    position: sticky; /* KUNCI UTAMA */
+    top: 0;           /* Tempel di bagian paling atas wadah */
+    z-index: 10;      /* Pastikan posisinya di atas data isinya */
+    
+    /* Wajib ada warna background, kalau transparan nanti tulisan header & isi bertumpuk jelek */
+    background-color: #d9d9d9; 
+    border-bottom: 2px solid #000;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1); /* Bayangan sedikit biar tegas */
+}
+
+/* Trik: Saat Export Gambar, matikan limit tinggi biar ke-foto semua datanya */
+.full-height-capture {
+    height: auto !important;
+    overflow: visible !important;
+}
+
+/* --- FIX FREEZE HEADER MULTI-ROW --- */
+/* Menghapus batasan (border) di sekeliling tabel harian sesuai permintaan */
+.excel-container {
+    width: 100%;
+    overflow-x: auto;
+    border: none !important; /* Menghilangkan batasan luar */
+    background: #fff;
+}
+
+/* Memastikan wadah scroll di Page Harian tidak membatasi tinggi saat capture */
+#areaTabelHarian {
+    height: 70vh; /* Tinggi di layar HP */
+    overflow-y: auto;
+    border: none !important;
+}
+
+/* Logika Sticky untuk 3 Baris Header agar tidak tumpang tindih */
+#tabelHarian thead tr:nth-child(1) th {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+#tabelHarian thead tr:nth-child(2) th {
+    position: sticky;
+    top: 25px; /* Sesuaikan dengan tinggi baris ke-1 */
+    z-index: 10;
+}
+
+#tabelHarian thead tr:nth-child(3) th {
+    position: sticky;
+    top: 50px; /* Sesuaikan dengan tinggi baris ke-1 + ke-2 */
+    z-index: 10;
+}
+
+/* Mematikan sticky saat export agar gambar tidak terpotong atau berantakan */
+.no-sticky thead th {
+    position: static !important;
+}
+
+/* Class pembantu agar tabel memanjang penuh saat difoto */
+.full-height-capture {
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+}
+
+/* --- FIX FREEZE HEADER DENGAN GARIS SEMPURNA --- */
+.harian-scroll-area {
+    height: 65vh;
+    overflow: auto;
+    position: relative;
+    /* Jangan pakai border di container, tapi di tabelnya */
+    border: none !important; 
+}
+
+#tabelHarian {
+    border-collapse: separate; /* KUNCI: Biar garis ikut freeze */
+    border-spacing: 0;
+    width: 100%;
+}
+
+#tabelHarian th, #tabelHarian td {
+    border: 1px solid #000; /* Garis tegas Excel */
+    padding: 8px;
+}
+
+/* Pengaturan Sticky Baris per Baris */
+#tabelHarian thead tr:nth-child(1) th { position: sticky; top: 0; z-index: 10; background: #d9d9d9; }
+#tabelHarian thead tr:nth-child(2) th { position: sticky; top: 38px; z-index: 10; background: #d9d9d9; }
+#tabelHarian thead tr:nth-child(3) th { position: sticky; top: 76px; z-index: 10; background: #d9d9d9; }
+
+/* Matikan sticky saat export */
+.no-sticky thead th {
+    position: static !important;
+}

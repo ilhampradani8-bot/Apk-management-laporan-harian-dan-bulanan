@@ -169,55 +169,62 @@
 
 
 
-
 <section id="page-harian" class="page">
-    <div class="modern-card" style="margin-bottom:10px;" data-html2canvas-ignore>
-        <div class="form-grid">
+    
+    <div class="modern-card" style="margin-bottom:5px; padding:10px;" data-html2canvas-ignore>
+        <div class="filter-mini">
             <input type="date" id="filter-tgl-mulai" onchange="renderHarian()">
             <input type="date" id="filter-tgl-akhir" onchange="renderHarian()">
-            <select id="filter-barang" onchange="renderHarian()" style="grid-column: span 2;">
-                <option value="">-- Semua Barang --</option>
-            </select>
+            <select id="filter-barang" onchange="renderHarian()">
+                <option value="">Semua</option>
+                </select>
         </div>
     </div>
-    <div class="table-actions" data-html2canvas-ignore>
+
+    <div class="table-actions" data-html2canvas-ignore style="margin-bottom:5px;">
         <button onclick="exportExcel('tabelHarian', 'Harian')" class="btn-green">XLS</button>
-        <button onclick="exportGambar('tabelHarian', 'Rekap_Harian_Full')" class="btn-blue">Export Gambar</button>
+        <button onclick="exportGambar('areaTabelHarian', 'Laporan_Harian')" class="btn-blue">Gambar</button>
+        <button onclick="document.getElementById('file-import').click()" style="background:#673AB7; color:white; border:none; padding:5px 15px; border-radius:4px; margin-left:5px;">📂 Import</button>
+        <input type="file" id="file-import" accept=".xlsx" style="display:none" onchange="importExcel(this)">
     </div>
-    <div class="excel-container">
+
+    <div id="areaTabelHarian" class="harian-scroll-area">
         <table id="tabelHarian">
             <thead>
                 <tr>
                     <th rowspan="3">TANGGAL</th>
-                    <th colspan="4">REKAP PEMBELIAN DAN PENJUALAN TELUR</th>
-                    <th colspan="7">SALDO AWAL</th>
+                    <th colspan="4">REKAP TRANSAKSI</th>
+                    <th colspan="7">KEUANGAN</th>
                 </tr>
                 <tr>
                     <th colspan="2">PEMBELIAN</th>
                     <th colspan="2">PENJUALAN</th>
-                    <th rowspan="2">Sisa Stok kg</th>
+                    <th rowspan="2">Sisa Stok</th>
                     <th rowspan="2">Harga/kg</th>
-                    <th rowspan="2">Uang Masuk</th>
-                    <th rowspan="2">Uang Keluar</th>
+                    <th rowspan="2">Masuk</th>
+                    <th rowspan="2">Keluar</th>
                     <th rowspan="2">Saldo</th>
-                    <th rowspan="2">Untung/Rugi</th>
-                    <th rowspan="2">Rata2/Hari</th>
+                    <th rowspan="2">Profit</th>
+                    <th rowspan="2">Avg/Hari</th>
                 </tr>
                 <tr>
-                    <th>NAMA BARANG</th>
-                    <th>JUMPLAH (KG)</th>
-                    <th>NAMA</th>
-                    <th>JUMPLAH KG</th>
+                    <th>Barang</th><th>Kg</th>
+                    <th>Barang</th><th>Kg</th>
                 </tr>
             </thead>
             <tbody id="bodyHarian"></tbody>
         </table>
     </div>
+
     <div id="sticky-saldo" class="floating-saldo" style="display:none;" data-html2canvas-ignore>
         Total Saldo Akhir
         <span id="txt-saldo-akhir">Rp0</span>
     </div>
 </section>
+
+
+
+
 
 
 <section id="page-bulanan" class="page">
@@ -275,6 +282,25 @@
                 💾 SIMPAN PROFIL
             </button>
         </div>
+
+<div class="card" style="margin-top:20px; border:1px solid #673AB7;">
+    <h3 style="color:#673AB7; margin-bottom:15px;">💾 Cadangkan & Pulihkan Data</h3>
+    <p style="font-size:12px; color:#666; margin-bottom:15px;">
+        Gunakan fitur ini untuk memindahkan semua data aplikasi ke HP lain.
+    </p>
+    
+    <div style="display:flex; gap:10px;">
+        <button onclick="backupData()" class="btn-blue" style="background:#673AB7; flex:1;">
+            Buat Backup (JSON)
+        </button>
+        
+        <button onclick="document.getElementById('file-restore').click()" class="btn-green" style="flex:1;">
+            Import Data
+        </button>
+    </div>
+    
+    <input type="file" id="file-restore" accept=".json" style="display:none" onchange="restoreData(this)">
+</div>
 
         <div class="card" style="border:1px solid #ffcdd2; background:#fff5f5;">
             <h3 style="color:#d32f2f;">Zona Bahaya</h3>
