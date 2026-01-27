@@ -1,3 +1,153 @@
+// ==========================================
+// ☁️ KONFIGURASI SUPABASE (DATABASE AWAN)
+// ==========================================
+// Pastikan tidak ada kode 'const supabase' lain selain blok ini
+
+// 1. Ambil fungsi createClient dari library yang kita pasang di HTML
+const { createClient } = supabase;
+
+// 2. Masukkan URL dan Key (ANON)
+const supaUrl = 'https://arcgcwsacncqeqvtiyir.supabase.co';
+// Ganti bagian supaKey kamu dengan ini (pastikan satu baris lurus)
+const supaKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFyY2djd3NhY25jcWVxdnRpeWlyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgwNzAzMjcsImV4cCI6MjA4MzY0NjMyN30.gvPJkIjOS6jD9FDh6Ge7-fxYbbfYH08Pcv4aSKL0FkQ';
+
+// 3. Buat Koneksi (Kita namakan 'dbAwan' biar tidak bentrok nama)
+const dbAwan = createClient(supaUrl, supaKey);
+
+// --- FUNGSI 1: UPLOAD DATA (BACKUP KE AWAN) ---
+
+// --- FUNGSI 2: DOWNLOAD DATA (AMBIL DARI AWAN) ---
+// --- FUNGSI 1: UPLOAD DATA (DENGAN CEK SINYAL) ---
+// --- FUNGSI 1: UPLOAD (DENGAN INDIKATOR PROSES) ---
+async function syncKeAwan() {
+    // 1. Cek Koneksi Awal
+    if (!navigator.onLine) {
+        alert("❌ Tidak ada internet. Cek koneksi Data/WiFi.");
+        return;
+    }
+    
+    try {
+        // TAHAP 1: MENGHUBUNGKAN
+        showProgress("📡 Menghubungkan ke Server...", 5000); // Durasi lama biar gak hilang
+        
+        // Bungkus data
+        const dataPaket = {
+            transaksi: db,
+            stok: stok_db,
+            profil: profil,
+            riwayat: log_db,
+            tgl_sync: new Date().toLocaleString()
+        };
+        
+        // TAHAP 2: MENGUNGGAH
+        // Kita kasih jeda dikit biar tulisan terbaca
+        setTimeout(() => showProgress("☁️ Mengunggah Data...", 5000), 500);
+        
+        // Proses kirim ke Supabase
+        const { error } = await dbAwan
+            .from('tb_telur_barokah')
+            .upsert({ id: 1, content: dataPaket });
+        
+        if (error) throw error;
+        
+        // TAHAP 3: SUKSES
+        showProgress("✅ Upload Berhasil!");
+        
+        // Opsional: Bunyi notifikasi kecil atau getar kalau di HP
+        if (navigator.vibrate) navigator.vibrate(200);
+        
+    } catch (err) {
+        showProgress("❌ Gagal!", 1000);
+        setTimeout(() => {
+            alert("Eror: " + err.message + "\n(Cek sinyal internet)");
+        }, 500);
+    }
+}
+
+// --- FUNGSI 2: DOWNLOAD (DENGAN INDIKATOR PROSES) ---
+// --- FUNGSI 2: DOWNLOAD (DENGAN SMART MERGE / ANTI-DUPLIKAT) ---
+async function tarikDariAwan() {
+    if (!navigator.onLine) {
+        alert("❌ Tidak ada internet.");
+        return;
+    }
+    
+    try {
+        showProgress("📡 Menghubungkan ke Server...", 5000);
+        
+        // 1. Ambil data dari Server
+        const { data, error } = await dbAwan
+            .from('tb_telur_barokah')
+            .select('content')
+            .eq('id', 1)
+            .single();
+        
+        if (error) throw error;
+        
+        showProgress("⬇️ Membandingkan Data...", 2000);
+        
+        if (data && data.content) {
+            const server = data.content;
+            const serverTrx = server.transaksi || [];
+            
+            openModal("Sinkronisasi Cerdas",
+                `Data Server: <b>${server.tgl_sync || '-'}</b><br>
+                 Jumlah: ${serverTrx.length} Transaksi.<br><br>
+                 Aplikasi akan menggabungkan data baru dan membuang yang duplikat. Lanjutkan?`,
+                () => {
+                    // --- LOGIKA ANTI-DUPLIKAT (SMART MERGE) ---
+                    let dataBaruMasuk = 0;
+                    
+                    // 1. Buat "Sidik Jari" untuk semua data yang ada di HP sekarang
+                    // Sidik jari = Gabungan Tanggal + Nama Barang + Qty + Jam (biar unik)
+                    const jejakHP = new Set(db.map(item =>
+                        `${item.tgl}-${item.produk_terjual}-${item.jual_qty}-${item.uang_keluar}`
+                    ));
+                    
+                    // 2. Cek Data Server satu per satu
+                    serverTrx.forEach(itemServer => {
+                        // Bikin sidik jari untuk item dari server
+                        const sidikJari = `${itemServer.tgl}-${itemServer.produk_terjual}-${itemServer.jual_qty}-${itemServer.uang_keluar}`;
+                        
+                        // Cek: Kalau sidik jari ini BELUM ADA di HP, berarti ini data baru!
+                        if (!jejakHP.has(sidikJari)) {
+                            db.push(itemServer); // Masukkan ke database HP
+                            dataBaruMasuk++;
+                        }
+                        // Kalau sudah ada (Has), otomatis di-skip (Anti-Duplikat)
+                    });
+                    
+                    // 3. Update Stok & Profil (Timpa dengan yang terbaru dari server agar sinkron)
+                    if (server.stok && server.stok.length > 0) stok_db = server.stok;
+                    if (server.profil) profil = server.profil;
+                    
+                    // 4. Simpan Hasil Penggabungan
+                    localStorage.setItem('egg_db', JSON.stringify(db));
+                    localStorage.setItem('egg_stok_db', JSON.stringify(stok_db));
+                    localStorage.setItem('egg_profil', JSON.stringify(profil));
+                    
+                    // Render Ulang
+                    loadProfil();
+                    renderHarian();
+                    renderStokLengkap();
+                    renderRiwayat();
+                    
+                    showProgress(`🚀 Sukses! ${dataBaruMasuk} Data Baru Ditambahkan.`);
+                }
+            );
+        } else {
+            alert("Data di server masih kosong.");
+        }
+    } catch (err) {
+        showProgress("❌ Gagal!", 1000);
+        setTimeout(() => { alert("Eror: " + err.message); }, 500);
+    }
+}
+
+// ... DI BAWAH SINI ADALAH KODE LAMA KAMU (JANGAN DIHAPUS) ...
+// let db = ...
+// let stok_db = ...
+
 let db = JSON.parse(localStorage.getItem('egg_db')) || [];
 let stok_db = JSON.parse(localStorage.getItem('egg_stok_db')) || []; // Database stok produk
 let profil = JSON.parse(localStorage.getItem('egg_profil')) || { nama: "TELUR BAROKAH", saldoAwal: 3373900 };
@@ -1140,28 +1290,155 @@ function bayarUtang(index, event) {
     );
 }
 
+
+// --- DATABASE SAMPAH (Untuk Sinkronisasi Hapus) ---
+let deleted_ids = JSON.parse(localStorage.getItem('egg_deleted')) || [];
+
+// --- 1. UPDATE FUNGSI HAPUS (Agar Tercatat) ---
+// Ganti fungsi hapusTransaksi yang lama dengan ini
 function hapusTransaksi(index) {
     const item = db[index];
-    const info = item.beli_nama !== '-' ? 
-                 `Pembelian: ${item.beli_nama} (${item.beli_qty}kg)` : 
-                 `Penjualan: ${item.jual_nama} (${item.jual_qty}kg)`;
-
-    openModal("Hapus Transaksi", 
-        `Yakin ingin menghapus baris ini?<br><br>
-         <b>${item.tgl}</b><br>${info}<br><br>
-         <small style="color:red;">*Data yang dihapus tidak bisa dikembalikan.</small>`,
+    const info = item.beli_nama !== '-' ?
+        `Pembelian: ${item.beli_nama}` :
+        `Penjualan: ${item.produk_terjual}`;
+    
+    openModal("Hapus Data",
+        `Hapus <b>${info}</b>?<br>Data akan ikut terhapus di HP lain saat Sync.`,
         () => {
-            // Hapus dari database
+            // 1. Buat Sidik Jari Unik Data Ini
+            // (Gabungan Tgl + Produk + Qty + Jam + Uang)
+            const sidikJari = `${item.tgl}-${item.produk_terjual}-${item.jual_qty}-${item.uang_keluar}-${item.harga_jual}`;
+            
+            // 2. Masukkan ke Daftar Sampah (Blacklist)
+            deleted_ids.push(sidikJari);
+            localStorage.setItem('egg_deleted', JSON.stringify(deleted_ids));
+            
+            // 3. Hapus dari Database Lokal
             db.splice(index, 1);
             localStorage.setItem('egg_db', JSON.stringify(db));
             
-            // Catat Log
-            catatLog(`🗑️ Hapus Transaksi: ${item.tgl}`, new Date().toISOString().split('T')[0]);
+            // 4. Catat Log (Agar ketahuan siapa yg hapus)
+            catatLog(`🗑️ Menghapus: ${info}`, item.tgl);
             
             renderHarian();
-            showProgress("Baris berhasil dihapus!");
+            showProgress("Data dihapus & dicatat untuk Sync.");
         }
     );
+}
+
+// --- 2. FITUR SYNC SATU TOMBOL (AUTO PILOT) ---
+// Ini menggantikan fungsi syncKeAwan dan tarikDariAwan yang lama
+async function syncSatuTombol() {
+    if (!navigator.onLine) {
+        alert("❌ Tidak ada internet.");
+        return;
+    }
+    
+    try {
+        // TAHAP 1: AMBIL DATA SERVER
+        showProgress("🔄 Sinkronisasi Cerdas...", 5000);
+        
+        const { data, error } = await dbAwan
+            .from('tb_telur_barokah')
+            .select('content')
+            .eq('id', 1)
+            .single();
+        
+        let serverData = { transaksi: [], sampah: [], stok: [], riwayat: [] };
+        
+        // Jika server ada data, ambil dulu
+        if (data && data.content) {
+            serverData = data.content;
+        }
+        
+        // TAHAP 2: PROSES DATA (LOGIKA INTI)
+        showProgress("⚙️ Mengolah Data...", 5000);
+        
+        // A. GABUNGKAN SAMPAH (Deleted List)
+        // Sampah HP ini + Sampah dari Server
+        const semuaSampah = new Set([...deleted_ids, ...(serverData.sampah || [])]);
+        
+        // B. BERSIHKAN DATA SERVER (Buang data yg ada di daftar sampah)
+        let serverTrxBersih = (serverData.transaksi || []).filter(item => {
+            const id = `${item.tgl}-${item.produk_terjual}-${item.jual_qty}-${item.uang_keluar}-${item.harga_jual}`;
+            return !semuaSampah.has(id);
+        });
+        
+        // C. BERSIHKAN DATA HP INI (Buang data yg ada di daftar sampah)
+        db = db.filter(item => {
+            const id = `${item.tgl}-${item.produk_terjual}-${item.jual_qty}-${item.uang_keluar}-${item.harga_jual}`;
+            return !semuaSampah.has(id);
+        });
+        
+        // D. GABUNGKAN DATA (SMART MERGE - ANTI DUPLIKAT)
+        // Buat daftar ID data yang sekarang ada di HP
+        const jejakHP = new Set(db.map(item =>
+            `${item.tgl}-${item.produk_terjual}-${item.jual_qty}-${item.uang_keluar}-${item.harga_jual}`
+        ));
+        
+        let dataBaruMasuk = 0;
+        serverTrxBersih.forEach(itemServer => {
+            const sidikJari = `${itemServer.tgl}-${itemServer.produk_terjual}-${itemServer.jual_qty}-${itemServer.uang_keluar}-${itemServer.harga_jual}`;
+            
+            // Kalau data server ini belum ada di HP & bukan sampah -> Masukkan
+            if (!jejakHP.has(sidikJari)) {
+                db.push(itemServer);
+                dataBaruMasuk++;
+            }
+        });
+        
+        // E. GABUNGKAN RIWAYAT & STOK
+        // Stok: Kita ambil yang paling baru saja (Timpa stok HP dengan stok Server atau sebaliknya, agak tricky, 
+        // tapi paling aman kita prioritaskan Server kalau ada perubahan banyak)
+        if (serverData.stok && serverData.stok.length > 0) stok_db = serverData.stok;
+        
+        // Riwayat: Gabung unik
+        let logGabung = [...log_db, ...(serverData.riwayat || [])];
+        // Hapus duplikat log (berdasarkan waktu & aktivitas)
+        const logMap = new Map();
+        logGabung.forEach(l => logMap.set(l.tgl + l.akt, l));
+        log_db = Array.from(logMap.values())
+            .sort((a, b) => new Date(b.tgl + ' ' + b.jam) - new Date(a.tgl + ' ' + a.jam)) // Urutkan terbaru
+            .slice(0, 100); // Batasi 100 log terakhir
+        
+        // TAHAP 3: UPLOAD HASIL GABUNGAN KE SERVER
+        showProgress("☁️ Menyimpan Hasil...", 5000);
+        
+        const paketFinal = {
+            transaksi: db,
+            sampah: Array.from(semuaSampah), // Simpan daftar sampah agar HP lain tahu
+            stok: stok_db,
+            profil: profil,
+            riwayat: log_db,
+            tgl_sync: new Date().toLocaleString()
+        };
+        
+        const { error: errUpload } = await dbAwan
+            .from('tb_telur_barokah')
+            .upsert({ id: 1, content: paketFinal });
+        
+        if (errUpload) throw errUpload;
+        
+        // TAHAP 4: SIMPAN DI HP & REFRESH
+        localStorage.setItem('egg_db', JSON.stringify(db));
+        localStorage.setItem('egg_deleted', JSON.stringify(Array.from(semuaSampah))); // Simpan sampah lokal juga
+        localStorage.setItem('egg_stok_db', JSON.stringify(stok_db));
+        localStorage.setItem('egg_profil', JSON.stringify(profil));
+        localStorage.setItem('egg_log', JSON.stringify(log_db));
+        
+        loadProfil();
+        renderHarian();
+        renderStokLengkap();
+        renderRiwayat();
+        
+        let pesan = dataBaruMasuk > 0 ? `✅ Masuk ${dataBaruMasuk} data baru.` : "✅ Data Sinkron.";
+        showProgress(pesan);
+        if (navigator.vibrate) navigator.vibrate(500); // Getar panjang tanda sukses
+        
+    } catch (err) {
+        showProgress("❌ Gagal!", 1000);
+        setTimeout(() => { alert("Eror Sync: " + err.message); }, 500);
+    }
 }
 
 function resetRiwayat() {
@@ -1558,4 +1835,27 @@ function restoreData(input) {
         input.value = ''; // Reset input
     };
     reader.readAsText(file);
+}
+
+
+// --- ALAT DIAGNOSA MASALAH KONEKSI ---
+async function cekJalurServer() {
+    showProgress("🕵️ Mendiagnosa Jalur...", 2000);
+    
+    const urlTarget = 'https://arcgcwsacncqevtiyir.supabase.co'; // URL Proyekmu
+    
+    try {
+        // Kita coba ping servernya langsung tanpa lewat library Supabase
+        const response = await fetch(urlTarget, {
+            method: 'HEAD',
+            mode: 'no-cors' // Trik bypass aturan ketat browser
+        });
+        
+        // Kalau sampai sini, berarti jalur TERBUKA
+        alert("✅ DIAGNOSA: Jalur Internet ke Supabase TERBUKA!\nMasalahnya ada di pengaturan Key/Library, bukan sinyal.");
+        
+    } catch (err) {
+        // Kalau masuk sini, berarti jalur DIBLOKIR
+        alert("❌ DIAGNOSA: Jalur DIBLOKIR Browser/HP!\nError: " + err.message + "\n\nSolusi:\n1. Matikan AdBlock/DNS Pribadi\n2. Buka di Chrome (jangan di preview editor)");
+    }
 }

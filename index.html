@@ -22,7 +22,9 @@
     });
   }
 </script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </body>
+
 </head>
 <body>
 
@@ -283,23 +285,17 @@
             </button>
         </div>
 
-<div class="card" style="margin-top:20px; border:1px solid #673AB7;">
-    <h3 style="color:#673AB7; margin-bottom:15px;">💾 Cadangkan & Pulihkan Data</h3>
-    <p style="font-size:12px; color:#666; margin-bottom:15px;">
-        Gunakan fitur ini untuk memindahkan semua data aplikasi ke HP lain.
+
+<div class="card" style="margin-top:20px; border:1px solid #008CBA; background:#E0F7FA;">
+    <h3 style="color:#006064; margin-bottom:5px;">🔄 Sinkronisasi Otomatis</h3>
+    <p style="font-size:11px; color:#555; margin-bottom:15px;">
+        Klik tombol ini di HP Kasir & HP Owner agar data selalu sama.
+        (Termasuk data yang dihapus akan ikut hilang).
     </p>
     
-    <div style="display:flex; gap:10px;">
-        <button onclick="backupData()" class="btn-blue" style="background:#673AB7; flex:1;">
-            Buat Backup (JSON)
-        </button>
-        
-        <button onclick="document.getElementById('file-restore').click()" class="btn-green" style="flex:1;">
-            Import Data
-        </button>
-    </div>
-    
-    <input type="file" id="file-restore" accept=".json" style="display:none" onchange="restoreData(this)">
+    <button onclick="syncSatuTombol()" class="btn-blue" style="width:100%; background:#0097A7; padding:15px; font-size:16px; font-weight:bold;">
+        🔄 SYNC SEKARANG
+    </button>
 </div>
 
         <div class="card" style="border:1px solid #ffcdd2; background:#fff5f5;">
@@ -461,6 +457,8 @@
         </div>
     </div>
 </div>
+
+
 
 <script src="script.js"></script>
 </body>
