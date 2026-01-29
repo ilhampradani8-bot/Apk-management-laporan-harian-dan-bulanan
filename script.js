@@ -509,6 +509,8 @@ function prosesBayar() {
 
             localStorage.setItem('egg_stok_db', JSON.stringify(stok_db));
             localStorage.setItem('egg_db', JSON.stringify(db));
+            
+            triggerUpdateStok();
 
             tampilkanStruk(keranjang, totalBayar, tgl, jualNama);
 
@@ -561,6 +563,8 @@ function bayarLangsung() {
 
             localStorage.setItem('egg_stok_db', JSON.stringify(stok_db));
             localStorage.setItem('egg_db', JSON.stringify(db));
+            
+            triggerUpdateStok();
 
             const keranjangMini = [{ produk: produkNama, qty: qty, harga: harga, subtotal: total }];
             tampilkanStruk(keranjangMini, total, tgl, jualNama);
@@ -825,6 +829,7 @@ function tambahStokMasuk() {
 
     localStorage.setItem('egg_db', JSON.stringify(db));
     localStorage.setItem('egg_stok_db', JSON.stringify(stok_db));
+    triggerUpdateStok();
     
     showProgress("Stok Berhasil Ditambah!");
     
@@ -1026,6 +1031,9 @@ function hapusStok(index) {
         () => {
             stok_db.splice(index, 1);
             localStorage.setItem('egg_stok_db', JSON.stringify(stok_db));
+            
+            triggerUpdateStok(); 
+// ---------------------
             renderStokLengkap();
             showProgress("Data Dihapus");
         }
@@ -1051,6 +1059,8 @@ function editStok(index) {
             stok_db[index].qty = Number(nQty);
             stok_db[index].harga_jual = Number(nHarga);
             localStorage.setItem('egg_stok_db', JSON.stringify(stok_db));
+            
+            triggerUpdateStok();
             renderStokLengkap();
             showProgress("Stok Diupdate!");
         }
@@ -1328,6 +1338,7 @@ function hapusTransaksi(index) {
 
 // --- 2. FITUR SYNC SATU TOMBOL (AUTO PILOT) ---
 // Ini menggantikan fungsi syncKeAwan dan tarikDariAwan yang lama
+// === UPDATE: LOGIC SYNC DENGAN CEK WAKTU (TIMESTAMP) ===
 async function syncSatuTombol() {
     if (!navigator.onLine) {
         alert("❌ Tidak ada internet.");
@@ -1335,8 +1346,7 @@ async function syncSatuTombol() {
     }
     
     try {
-        // TAHAP 1: AMBIL DATA SERVER
-        showProgress("🔄 Sinkronisasi Cerdas...", 5000);
+        showProgress("🔄 Cek Data Server...", 5000);
         
         const { data, error } = await dbAwan
             .from('tb_telur_barokah')
@@ -1344,84 +1354,78 @@ async function syncSatuTombol() {
             .eq('id', 1)
             .single();
         
-        let serverData = { transaksi: [], sampah: [], stok: [], riwayat: [] };
+        let serverData = { transaksi: [], sampah: [], stok: [], riwayat: [], waktu_stok: 0 };
+        if (data && data.content) serverData = data.content;
         
-        // Jika server ada data, ambil dulu
-        if (data && data.content) {
-            serverData = data.content;
-        }
+        showProgress("⚙️ Membandingkan Data...", 5000);
         
-        // TAHAP 2: PROSES DATA (LOGIKA INTI)
-        showProgress("⚙️ Mengolah Data...", 5000);
-        
-        // A. GABUNGKAN SAMPAH (Deleted List)
-        // Sampah HP ini + Sampah dari Server
+        // 1. SYNC TRANSAKSI (Logic Lama: Gabung & Anti-Duplikat)
         const semuaSampah = new Set([...deleted_ids, ...(serverData.sampah || [])]);
         
-        // B. BERSIHKAN DATA SERVER (Buang data yg ada di daftar sampah)
-        let serverTrxBersih = (serverData.transaksi || []).filter(item => {
-            const id = `${item.tgl}-${item.produk_terjual}-${item.jual_qty}-${item.uang_keluar}-${item.harga_jual}`;
-            return !semuaSampah.has(id);
-        });
+        // Bersihkan Server & HP dari sampah
+        let serverTrxBersih = (serverData.transaksi || []).filter(item => !semuaSampah.has(bikinID(item)));
+        db = db.filter(item => !semuaSampah.has(bikinID(item)));
         
-        // C. BERSIHKAN DATA HP INI (Buang data yg ada di daftar sampah)
-        db = db.filter(item => {
-            const id = `${item.tgl}-${item.produk_terjual}-${item.jual_qty}-${item.uang_keluar}-${item.harga_jual}`;
-            return !semuaSampah.has(id);
-        });
-        
-        // D. GABUNGKAN DATA (SMART MERGE - ANTI DUPLIKAT)
-        // Buat daftar ID data yang sekarang ada di HP
-        const jejakHP = new Set(db.map(item =>
-            `${item.tgl}-${item.produk_terjual}-${item.jual_qty}-${item.uang_keluar}-${item.harga_jual}`
-        ));
-        
-        let dataBaruMasuk = 0;
-        serverTrxBersih.forEach(itemServer => {
-            const sidikJari = `${itemServer.tgl}-${itemServer.produk_terjual}-${itemServer.jual_qty}-${itemServer.uang_keluar}-${itemServer.harga_jual}`;
-            
-            // Kalau data server ini belum ada di HP & bukan sampah -> Masukkan
-            if (!jejakHP.has(sidikJari)) {
-                db.push(itemServer);
-                dataBaruMasuk++;
+        // Gabungkan
+        const jejakHP = new Set(db.map(item => bikinID(item)));
+        let dataBaru = 0;
+        serverTrxBersih.forEach(item => {
+            if (!jejakHP.has(bikinID(item))) {
+                db.push(item);
+                dataBaru++;
             }
         });
         
-        // E. GABUNGKAN RIWAYAT & STOK
-        // Stok: Kita ambil yang paling baru saja (Timpa stok HP dengan stok Server atau sebaliknya, agak tricky, 
-        // tapi paling aman kita prioritaskan Server kalau ada perubahan banyak)
-        if (serverData.stok && serverData.stok.length > 0) stok_db = serverData.stok;
+        // 2. SYNC STOK (LOGIC BARU: ADU WAKTU) 🕒
+        // Ambil waktu update terakhir dari HP & Server
+        const waktuHP = parseInt(localStorage.getItem('last_stok_update') || '0');
+        const waktuServer = serverData.waktu_stok || 0;
         
-        // Riwayat: Gabung unik
+        if (waktuServer > waktuHP) {
+            // Kalau Server LEBIH BARU update-nya daripada HP -> Timpa HP
+            if (serverData.stok && serverData.stok.length > 0) {
+                stok_db = serverData.stok;
+                localStorage.setItem('last_stok_update', waktuServer); // Update jam HP
+                console.log("Stok HP diperbarui dari Server");
+            }
+        } else if (waktuHP > waktuServer) {
+            // Kalau HP LEBIH BARU -> Server akan mengalah (nanti di-upload)
+            console.log("Stok HP lebih baru, Server akan diupdate");
+        }
+        // Kalau waktu sama, biarkan saja.
+        
+        // 3. SYNC RIWAYAT
         let logGabung = [...log_db, ...(serverData.riwayat || [])];
-        // Hapus duplikat log (berdasarkan waktu & aktivitas)
         const logMap = new Map();
-        logGabung.forEach(l => logMap.set(l.tgl + l.akt, l));
+        logGabung.forEach(l => logMap.set(l.tgl + l.akt, l)); // Unik via tgl+akt
         log_db = Array.from(logMap.values())
-            .sort((a, b) => new Date(b.tgl + ' ' + b.jam) - new Date(a.tgl + ' ' + a.jam)) // Urutkan terbaru
-            .slice(0, 100); // Batasi 100 log terakhir
+            .sort((a, b) => new Date(b.tgl + ' ' + b.jam) - new Date(a.tgl + ' ' + a.jam))
+            .slice(0, 100);
         
-        // TAHAP 3: UPLOAD HASIL GABUNGAN KE SERVER
-        showProgress("☁️ Menyimpan Hasil...", 5000);
+        // TAHAP UPLOAD
+        showProgress("☁️ Menyimpan Perubahan...", 5000);
         
+        // Tentukan stok mana yang mau diupload (Stok HP terkini)
+        // Kita juga upload 'waktuHP' agar server tahu kapan data ini diubah
         const paketFinal = {
             transaksi: db,
-            sampah: Array.from(semuaSampah), // Simpan daftar sampah agar HP lain tahu
-            stok: stok_db,
+            sampah: Array.from(semuaSampah),
+            stok: stok_db, // Stok HP Terkini
+            waktu_stok: parseInt(localStorage.getItem('last_stok_update') || Date.now()), // Kirim Waktu HP
             profil: profil,
             riwayat: log_db,
             tgl_sync: new Date().toLocaleString()
         };
         
-        const { error: errUpload } = await dbAwan
+        const { error: errUp } = await dbAwan
             .from('tb_telur_barokah')
             .upsert({ id: 1, content: paketFinal });
         
-        if (errUpload) throw errUpload;
+        if (errUp) throw errUp;
         
-        // TAHAP 4: SIMPAN DI HP & REFRESH
+        // Simpan Lokal
         localStorage.setItem('egg_db', JSON.stringify(db));
-        localStorage.setItem('egg_deleted', JSON.stringify(Array.from(semuaSampah))); // Simpan sampah lokal juga
+        localStorage.setItem('egg_deleted', JSON.stringify(Array.from(semuaSampah)));
         localStorage.setItem('egg_stok_db', JSON.stringify(stok_db));
         localStorage.setItem('egg_profil', JSON.stringify(profil));
         localStorage.setItem('egg_log', JSON.stringify(log_db));
@@ -1431,15 +1435,20 @@ async function syncSatuTombol() {
         renderStokLengkap();
         renderRiwayat();
         
-        let pesan = dataBaruMasuk > 0 ? `✅ Masuk ${dataBaruMasuk} data baru.` : "✅ Data Sinkron.";
+        let pesan = dataBaru > 0 ? `✅ Masuk ${dataBaru} Transaksi Baru.` : "✅ Data Sinkron.";
         showProgress(pesan);
-        if (navigator.vibrate) navigator.vibrate(500); // Getar panjang tanda sukses
         
     } catch (err) {
         showProgress("❌ Gagal!", 1000);
-        setTimeout(() => { alert("Eror Sync: " + err.message); }, 500);
+        setTimeout(() => alert("Eror: " + err.message), 500);
     }
 }
+
+// Helper bikin ID unik
+function bikinID(item) {
+    return `${item.tgl}-${item.produk_terjual}-${item.jual_qty}-${item.uang_keluar}-${item.harga_jual}`;
+}
+
 
 function resetRiwayat() {
     openModal("Hapus Semua Riwayat", 
@@ -1858,4 +1867,11 @@ async function cekJalurServer() {
         // Kalau masuk sini, berarti jalur DIBLOKIR
         alert("❌ DIAGNOSA: Jalur DIBLOKIR Browser/HP!\nError: " + err.message + "\n\nSolusi:\n1. Matikan AdBlock/DNS Pribadi\n2. Buka di Chrome (jangan di preview editor)");
     }
+}
+
+// Fungsi Pemicu Update Waktu Stok
+function triggerUpdateStok() {
+    const waktuSekarang = Date.now(); // Ambil waktu detik ini
+    localStorage.setItem('last_stok_update', waktuSekarang);
+    console.log("Waktu Stok Diupdate: " + waktuSekarang);
 }
