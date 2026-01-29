@@ -1,24 +1,31 @@
 // ==========================================
 // ☁️ KONFIGURASI SUPABASE (DATABASE AWAN)
 // ==========================================
-// Pastikan tidak ada kode 'const supabase' lain selain blok ini
+// Pastikan tidak ada kode 'const NGAN INDIKATOR PROSES) ---
 
-// 1. Ambil fungsi createClient dari library yang kita pasang di HTML
+// ==========================================
+// 1. KONFIGURASI SUPABASE
+// ==========================================
 const { createClient } = supabase;
-
-// 2. Masukkan URL dan Key (ANON)
 const supaUrl = 'https://arcgcwsacncqeqvtiyir.supabase.co';
-// Ganti bagian supaKey kamu dengan ini (pastikan satu baris lurus)
 const supaKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFyY2djd3NhY25jcWVxdnRpeWlyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgwNzAzMjcsImV4cCI6MjA4MzY0NjMyN30.gvPJkIjOS6jD9FDh6Ge7-fxYbbfYH08Pcv4aSKL0FkQ';
 
-// 3. Buat Koneksi (Kita namakan 'dbAwan' biar tidak bentrok nama)
-const dbAwan = createClient(supaUrl, supaKey);
+// Tambahkan opsi auth agar tidak bentrok di localhost
+const dbAwan = createClient(supaUrl, supaKey, {
+    auth: { persistSession: false } 
+});
 
-// --- FUNGSI 1: UPLOAD DATA (BACKUP KE AWAN) ---
+// ==========================================
+// 2. DATABASE LOKAL (KUMPULKAN DISINI SEMUA)
+// ==========================================
+let stok_db = JSON.parse(localStorage.getItem('egg_stok_db')) || [];
+let profil = JSON.parse(localStorage.getItem('egg_profil')) || { nama: "TELUR BAROKAH", saldoAwal: 0 };
+let log_db = JSON.parse(localStorage.getItem('egg_log')) || [];
 
-// --- FUNGSI 2: DOWNLOAD DATA (AMBIL DARI AWAN) ---
-// --- FUNGSI 1: UPLOAD DATA (DENGAN CEK SINYAL) ---
-// --- FUNGSI 1: UPLOAD (DENGAN INDIKATOR PROSES) ---
+// Database Sampah (Untuk Sync Hapus)
+let deleted_ids = JSON.parse(localStorage.getItem('egg_deleted')) || [];
+let deleted_stok = JSON.parse(localStorage.getItem('egg_deleted_stok')) || []; // <--- PASTI ADA DISINI
+
 async function syncKeAwan() {
     // 1. Cek Koneksi Awal
     if (!navigator.onLine) {
@@ -149,8 +156,7 @@ async function tarikDariAwan() {
 // let stok_db = ...
 
 let db = JSON.parse(localStorage.getItem('egg_db')) || [];
-let stok_db = JSON.parse(localStorage.getItem('egg_stok_db')) || []; // Database stok produk
-let profil = JSON.parse(localStorage.getItem('egg_profil')) || { nama: "TELUR BAROKAH", saldoAwal: 3373900 };
+// Database stok produk
 
 // Navigasi
 
@@ -1024,21 +1030,38 @@ function editSaldoAwal() {
 
 
 // Ganti fungsi hapusStok yang lama
+// --- DATABASE SAMPAH KHUSUS STOK 
+
+// GANTI FUNGSI hapusStok YANG LAMA DENGAN INI:
+// --- UPDATE FUNGSI HAPUS STOK (FIX BUG NAMA) ---
 function hapusStok(index) {
-    // Pengganti confirm()
+    // Pastikan data ada biar gak error
+    if (!stok_db[index]) return;
+
+    // Pakai 'produk', BUKAN 'nama_barang'
+    const namaProduk = stok_db[index].produk; 
+
     openModal("Hapus Barang", 
-        `Yakin ingin menghapus <b>${stok_db[index].produk}</b> dari database stok?`, 
+        `Yakin hapus <b>${namaProduk}</b>? <br>(Akan hilang di semua HP saat Sync)`, 
         () => {
+            // 1. Catat Nama Barang ke Blacklist
+            deleted_stok.push(namaProduk);
+            localStorage.setItem('egg_deleted_stok', JSON.stringify(deleted_stok));
+            
+            // 2. Hapus dari Database
             stok_db.splice(index, 1);
             localStorage.setItem('egg_stok_db', JSON.stringify(stok_db));
             
+            // 3. Pemicu Waktu & Render
             triggerUpdateStok(); 
-// ---------------------
             renderStokLengkap();
-            showProgress("Data Dihapus");
+            
+            showProgress("Barang dihapus & dicatat.");
         }
     );
 }
+
+
 
 // Ganti fungsi editStok yang lama
 function editStok(index) {
@@ -1162,7 +1185,6 @@ function kelolaSaldo() {
 }
 
 // Database Riwayat (Log)
-let log_db = JSON.parse(localStorage.getItem('egg_log')) || [];
 
 function catatLog(aktivitas, tanggal) {
     // Simpan log baru di paling atas
@@ -1302,7 +1324,6 @@ function bayarUtang(index, event) {
 
 
 // --- DATABASE SAMPAH (Untuk Sinkronisasi Hapus) ---
-let deleted_ids = JSON.parse(localStorage.getItem('egg_deleted')) || [];
 
 // --- 1. UPDATE FUNGSI HAPUS (Agar Tercatat) ---
 // Ganti fungsi hapusTransaksi yang lama dengan ini
@@ -1339,108 +1360,135 @@ function hapusTransaksi(index) {
 // --- 2. FITUR SYNC SATU TOMBOL (AUTO PILOT) ---
 // Ini menggantikan fungsi syncKeAwan dan tarikDariAwan yang lama
 // === UPDATE: LOGIC SYNC DENGAN CEK WAKTU (TIMESTAMP) ===
+
+
+
+// === UPDATE: SYNC DENGAN FITUR HAPUS STOK (ANTI MUNCUL LAGI) ===
+
+// === UPDATE: SYNC FINAL (FIX NAMA BARANG & ABORT ERROR) ===
+
+// === UPDATE FINAL: SYNC ROBUST (ANTI ABORT & SALAH BACA) ===
+// === VERSI FINAL: SYNC SABAR (ANTI ABORT ERROR) ===
 async function syncSatuTombol() {
     if (!navigator.onLine) {
-        alert("❌ Tidak ada internet.");
+        alert("❌ Tidak ada internet. Cek Data/WiFi.");
         return;
     }
-    
+
     try {
-        showProgress("🔄 Cek Data Server...", 5000);
-        
+        showProgress("🔄 Menghubungkan Server...", 9999); // Durasi panjang biar gak hilang
+
+        // 1. AMBIL DATA (Tanpa Timer Manual penyebab Abort)
         const { data, error } = await dbAwan
             .from('tb_telur_barokah')
             .select('content')
             .eq('id', 1)
             .single();
-        
-        let serverData = { transaksi: [], sampah: [], stok: [], riwayat: [], waktu_stok: 0 };
+
+        if (error) {
+            // Jika error koneksi, lempar ke catch
+            throw new Error(error.message);
+        }
+
+        // Siapkan wadah data
+        let serverData = { transaksi: [], sampah: [], stok: [], sampah_stok: [], riwayat: [], waktu_stok: 0 };
         if (data && data.content) serverData = data.content;
+
+        showProgress("⚙️ Memproses Data...", 2000);
+
+        // --- A. SYNC STOK (LOGIKA BARU) ---
+        // Gabung Sampah Stok
+        const totalSampahStok = new Set([...deleted_stok, ...(serverData.sampah_stok || [])]);
         
-        showProgress("⚙️ Membandingkan Data...", 5000);
+        // Helper Nama
+        const ambilNama = (item) => item.produk || item.nama_barang || "Tanpa Nama";
+
+        // Bersihkan Server dari barang sampah
+        if(serverData.stok && Array.isArray(serverData.stok)) {
+            serverData.stok = serverData.stok.filter(item => !totalSampahStok.has(ambilNama(item)));
+        }
+
+        // Bersihkan HP dari barang sampah
+        stok_db = stok_db.filter(item => !totalSampahStok.has(ambilNama(item)));
+
+        // Adu Waktu (Timestamp)
+        const waktuHP = parseInt(localStorage.getItem('last_stok_update') || '0');
+        const waktuServer = serverData.waktu_stok || 0;
+
+        if (waktuServer > waktuHP) {
+            if(serverData.stok && serverData.stok.length > 0) {
+                stok_db = serverData.stok;
+                localStorage.setItem('last_stok_update', waktuServer);
+            }
+        }
         
-        // 1. SYNC TRANSAKSI (Logic Lama: Gabung & Anti-Duplikat)
+        // --- B. SYNC TRANSAKSI ---
         const semuaSampah = new Set([...deleted_ids, ...(serverData.sampah || [])]);
         
-        // Bersihkan Server & HP dari sampah
+        // Filter & Gabung
         let serverTrxBersih = (serverData.transaksi || []).filter(item => !semuaSampah.has(bikinID(item)));
         db = db.filter(item => !semuaSampah.has(bikinID(item)));
-        
-        // Gabungkan
+
         const jejakHP = new Set(db.map(item => bikinID(item)));
         let dataBaru = 0;
+        
         serverTrxBersih.forEach(item => {
             if (!jejakHP.has(bikinID(item))) {
                 db.push(item);
                 dataBaru++;
             }
         });
-        
-        // 2. SYNC STOK (LOGIC BARU: ADU WAKTU) 🕒
-        // Ambil waktu update terakhir dari HP & Server
-        const waktuHP = parseInt(localStorage.getItem('last_stok_update') || '0');
-        const waktuServer = serverData.waktu_stok || 0;
-        
-        if (waktuServer > waktuHP) {
-            // Kalau Server LEBIH BARU update-nya daripada HP -> Timpa HP
-            if (serverData.stok && serverData.stok.length > 0) {
-                stok_db = serverData.stok;
-                localStorage.setItem('last_stok_update', waktuServer); // Update jam HP
-                console.log("Stok HP diperbarui dari Server");
-            }
-        } else if (waktuHP > waktuServer) {
-            // Kalau HP LEBIH BARU -> Server akan mengalah (nanti di-upload)
-            console.log("Stok HP lebih baru, Server akan diupdate");
-        }
-        // Kalau waktu sama, biarkan saja.
-        
-        // 3. SYNC RIWAYAT
+
+        // --- C. SYNC RIWAYAT ---
         let logGabung = [...log_db, ...(serverData.riwayat || [])];
         const logMap = new Map();
-        logGabung.forEach(l => logMap.set(l.tgl + l.akt, l)); // Unik via tgl+akt
+        logGabung.forEach(l => logMap.set(l.tgl + l.akt, l));
         log_db = Array.from(logMap.values())
-            .sort((a, b) => new Date(b.tgl + ' ' + b.jam) - new Date(a.tgl + ' ' + a.jam))
-            .slice(0, 100);
-        
-        // TAHAP UPLOAD
-        showProgress("☁️ Menyimpan Perubahan...", 5000);
-        
-        // Tentukan stok mana yang mau diupload (Stok HP terkini)
-        // Kita juga upload 'waktuHP' agar server tahu kapan data ini diubah
+                 .sort((a,b) => new Date(b.tgl + ' ' + b.jam) - new Date(a.tgl + ' ' + a.jam))
+                 .slice(0, 50);
+
+        // --- D. UPLOAD FINAL ---
+        showProgress("☁️ Menyimpan Data...", 9999);
+
+        const waktuFinal = (waktuHP > waktuServer) ? waktuHP : waktuServer;
         const paketFinal = {
             transaksi: db,
             sampah: Array.from(semuaSampah),
-            stok: stok_db, // Stok HP Terkini
-            waktu_stok: parseInt(localStorage.getItem('last_stok_update') || Date.now()), // Kirim Waktu HP
+            stok: stok_db, 
+            sampah_stok: Array.from(totalSampahStok),
+            waktu_stok: waktuFinal, 
             profil: profil,
             riwayat: log_db,
             tgl_sync: new Date().toLocaleString()
         };
-        
+
         const { error: errUp } = await dbAwan
             .from('tb_telur_barokah')
             .upsert({ id: 1, content: paketFinal });
-        
+
         if (errUp) throw errUp;
-        
+
         // Simpan Lokal
         localStorage.setItem('egg_db', JSON.stringify(db));
         localStorage.setItem('egg_deleted', JSON.stringify(Array.from(semuaSampah)));
         localStorage.setItem('egg_stok_db', JSON.stringify(stok_db));
+        localStorage.setItem('egg_deleted_stok', JSON.stringify(Array.from(totalSampahStok))); 
         localStorage.setItem('egg_profil', JSON.stringify(profil));
         localStorage.setItem('egg_log', JSON.stringify(log_db));
-        
+
+        // Render Ulang
         loadProfil();
         renderHarian();
         renderStokLengkap();
         renderRiwayat();
         
-        let pesan = dataBaru > 0 ? `✅ Masuk ${dataBaru} Transaksi Baru.` : "✅ Data Sinkron.";
+        let pesan = dataBaru > 0 ? `✅ Masuk ${dataBaru} Data Baru.` : "✅ Data Sinkron.";
         showProgress(pesan);
-        
+
     } catch (err) {
         showProgress("❌ Gagal!", 1000);
-        setTimeout(() => alert("Eror: " + err.message), 500);
+        // Alert detail errornya
+        setTimeout(() => alert("Gagal Sync: " + err.message), 500);
     }
 }
 
